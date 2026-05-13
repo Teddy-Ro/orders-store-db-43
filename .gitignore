@@ -1,0 +1,15 @@
+# Виртуальные окружения
+venv_u/
+.venvs/
+env/
+
+# Кэш Python
+__pycache__/
+*.pyc
+
+# Системные файлы окон и маков
+.DS_Store
+Thumbs.db
+
+# Настройки VS Code
+.vscode/
