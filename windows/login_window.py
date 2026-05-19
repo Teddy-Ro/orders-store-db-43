@@ -42,20 +42,12 @@ class LoginWindow(QDialog):
         login = self.txt_login.text().strip()
         password = self.txt_password.text().strip()
 
-        # =====================================================================
-        # Временный хардкод для тестов.
-        self.user_info = (0, "Test", 1, "developer")
-        self.accept()
-        return
-        # =====================================================================
-
-
         # Хардкодный KISS-вариант для тестов (если база пустая или лень искать логин из Faker)
-        if login == "admin" and password == "admin":
+        if login == "a" and password == "":
             self.user_info = (0, "Главный Администратор", 1, "Разработчик")
             self.accept()
             return
-        elif login == "seller" and password == "seller":
+        elif login == "s" and password == "":
             self.user_info = (0, "Иван Продавец", 2, "Менеджер")
             self.accept()
             return

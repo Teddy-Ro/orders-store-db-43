@@ -7,7 +7,7 @@ class CustomerDialog(QDialog):
         super().__init__(parent)
         self.customer_id = customer_data[0] if customer_data else None
         self.setWindowTitle("Редактирование клиента" if customer_data else "Новый клиент")
-        self.setFixedSize(350, 250)
+        self.setFixedSize(350, 200)
 
         layout = QVBoxLayout(self)
         form_layout = QFormLayout()
@@ -16,13 +16,11 @@ class CustomerDialog(QDialog):
         self.in_company = QLineEdit()
         self.in_phone = QLineEdit()
         self.in_email = QLineEdit()
-        self.in_address = QLineEdit()
 
         form_layout.addRow("ФИО *:", self.in_name)
         form_layout.addRow("Компания:", self.in_company)
         form_layout.addRow("Телефон:", self.in_phone)
         form_layout.addRow("Email:", self.in_email)
-        form_layout.addRow("Адрес доставки:", self.in_address)
 
         layout.addLayout(form_layout)
 
@@ -37,7 +35,6 @@ class CustomerDialog(QDialog):
             self.in_company.setText(str(customer_data[2] or ""))
             self.in_phone.setText(str(customer_data[3] or ""))
             self.in_email.setText(str(customer_data[4] or ""))
-            self.in_address.setText(str(customer_data[5] or ""))
 
     def save_data(self):
         # 1. Считываем данные и обрезаем лишние пробелы по краям
@@ -45,7 +42,6 @@ class CustomerDialog(QDialog):
         company = self.in_company.text().strip()
         phone = self.in_phone.text().strip()
         email = self.in_email.text().strip()
-        address = self.in_address.text().strip()
 
         # ==========================================
         # БЛОК ВАЛИДАЦИИ (ПРОВЕРКИ ДАННЫХ)
@@ -84,9 +80,9 @@ class CustomerDialog(QDialog):
         try:
             # Заменяем пустые строки на None, чтобы в БД записался корректный NULL
             if self.customer_id:
-                update_customer(self.customer_id, name, company or None, phone or None, email or None, address or None)
+                update_customer(self.customer_id, name, company or None, phone or None, email or None)
             else:
-                add_customer(name, company or None, phone or None, email or None, address or None)
+                add_customer(name, company or None, phone or None, email or None)
             
             self.accept() # Успех, закрываем окно
             

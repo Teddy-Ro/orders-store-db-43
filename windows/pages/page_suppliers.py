@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
+from PyQt6.QtWidgets import (QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
                              QTableWidget, QTableWidgetItem, QMessageBox, QMenu, QAbstractItemView)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
@@ -12,11 +12,22 @@ class PageSuppliers(QWidget):
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("<h3>🏭 База поставщиков</h3>"))
+
+        toolbar.addWidget(QLabel("🔍 Поиск:"))
+        self.in_search = QLineEdit()
+        self.in_search.setFixedWidth(200)
+        self.in_search.textChanged.connect(self.filter_table)
+        toolbar.addWidget(self.in_search)
+
         toolbar.addStretch()
         
         self.btn_add = QPushButton("➕ Добавить поставщика")
         self.btn_add.clicked.connect(self.add_supplier)
         toolbar.addWidget(self.btn_add)
+
+        self.btn_refresh = QPushButton("🔄 Обновить")
+        self.btn_refresh.clicked.connect(self.load_data) # Или load_orders, как называется твоя функция
+        toolbar.addWidget(self.btn_refresh)
         layout.addLayout(toolbar)
 
         self.table = QTableWidget(0, 5)
@@ -45,6 +56,17 @@ class PageSuppliers(QWidget):
                     self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(cell_data if cell_data is not None else "")))
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки:\n{e}")
+        
+    def filter_table(self, text):
+        search_text = text.lower()
+        for row in range(self.table.rowCount()): # Убедись, что твоя таблица называется self.table
+            row_visible = False
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                if item and search_text in item.text().lower():
+                    row_visible = True
+                    break
+            self.table.setRowHidden(row, not row_visible)
 
     def show_context_menu(self, position):
         item = self.table.itemAt(position)

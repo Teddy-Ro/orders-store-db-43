@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QMessageBox, QMenu, QAbstractItemView
+from PyQt6.QtWidgets import QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QTableWidget, QTableWidgetItem, QMessageBox, QMenu, QAbstractItemView
 from PyQt6.QtCore import Qt
 from database.queries import get_all_employees, delete_employee
 from windows.dialogs.employee_dialog import EmployeeDialog
@@ -8,9 +8,22 @@ class PageEmployees(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("<h3>🧑‍💼 Штат сотрудников</h3>")); toolbar.addStretch()
+        toolbar.addWidget(QLabel("<h3>🧑‍💼 Штат сотрудников</h3>"))
+
+        toolbar.addWidget(QLabel("🔍 Поиск:"))
+        self.in_search = QLineEdit()
+        self.in_search.setFixedWidth(200)
+        self.in_search.textChanged.connect(self.filter_table)
+        toolbar.addWidget(self.in_search)
+        
+        toolbar.addStretch()
         btn_add = QPushButton("➕ Новый сотрудник"); btn_add.clicked.connect(self.add_emp)
-        toolbar.addWidget(btn_add); layout.addLayout(toolbar)
+        toolbar.addWidget(btn_add)
+        
+        self.btn_refresh = QPushButton("🔄 Обновить")
+        self.btn_refresh.clicked.connect(self.load_data) # Или load_orders, как называется твоя функция
+        toolbar.addWidget(self.btn_refresh)
+        layout.addLayout(toolbar)
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["ID", "ФИО", "Должность", "Логин", "Пароль", "Уровень"])
@@ -31,6 +44,17 @@ class PageEmployees(QWidget):
         for row, data in enumerate(get_all_employees()):
             self.table.insertRow(row)
             for col, cell in enumerate(data): self.table.setItem(row, col, QTableWidgetItem(str(cell if cell else "")))
+
+    def filter_table(self, text):
+        search_text = text.lower()
+        for row in range(self.table.rowCount()): # Убедись, что твоя таблица называется self.table
+            row_visible = False
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                if item and search_text in item.text().lower():
+                    row_visible = True
+                    break
+            self.table.setRowHidden(row, not row_visible)
 
     def show_menu(self, pos):
         item = self.table.itemAt(pos)

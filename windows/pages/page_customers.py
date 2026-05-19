@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
+from PyQt6.QtWidgets import (QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
                              QTableWidget, QTableWidgetItem, QMessageBox, QMenu, QAbstractItemView)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
@@ -13,16 +13,27 @@ class PageCustomers(QWidget):
         # Панель инструментов
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("<h3>👥 База клиентов</h3>"))
+
+        toolbar.addWidget(QLabel("🔍 Поиск:"))
+        self.in_search = QLineEdit()
+        self.in_search.setFixedWidth(200)
+        self.in_search.textChanged.connect(self.filter_table)
+        toolbar.addWidget(self.in_search)
+
         toolbar.addStretch()
         
         self.btn_add = QPushButton("➕ Добавить клиента")
         self.btn_add.clicked.connect(self.add_customer)
         toolbar.addWidget(self.btn_add)
+
+        self.btn_refresh = QPushButton("🔄 Обновить")
+        self.btn_refresh.clicked.connect(self.load_data) # Или load_orders, как называется твоя функция
+        toolbar.addWidget(self.btn_refresh)
         layout.addLayout(toolbar)
 
         # Таблица (Только для чтения!)
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["ID", "ФИО", "Компания", "Телефон", "Email", "Адрес доставки"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["ID", "ФИО", "Компания", "Телефон", "Email"])
         self.table.setColumnWidth(0, 50)   # ID
         self.table.setColumnWidth(1, 220)  # ФИО (делаем шире)
         self.table.setColumnWidth(2, 150)  # Компания
@@ -51,6 +62,17 @@ class PageCustomers(QWidget):
                     self.table.setItem(row_idx, col_idx, item)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки:\n{e}")
+
+    def filter_table(self, text):
+        search_text = text.lower()
+        for row in range(self.table.rowCount()): # Убедись, что твоя таблица называется self.table
+            row_visible = False
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                if item and search_text in item.text().lower():
+                    row_visible = True
+                    break
+            self.table.setRowHidden(row, not row_visible)
 
     def show_context_menu(self, position):
         """Отрисовка выпадающего меню при нажатии ПКМ"""
@@ -84,7 +106,7 @@ class PageCustomers(QWidget):
 
     def edit_customer(self, row):
         # Собираем данные из выделенной строки
-        customer_data = [self.table.item(row, i).text() for i in range(6)]
+        customer_data = [self.table.item(row, i).text() for i in range(5)]
         
         dialog = CustomerDialog(self, customer_data)
         if dialog.exec():

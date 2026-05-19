@@ -23,17 +23,12 @@ def init_database():
         conn.close()
 
 def get_all_customers():
-    """Возвращает всех клиентов (теперь с email и адресом)."""
-    conn = get_connection()
-    cur = conn.cursor()
+    conn = get_connection(); cur = conn.cursor()
     try:
-        cur.execute("""
-            SELECT CustomerID, FullName, CompanyName, PhoneNumber, Email, ShippingAddress 
-            FROM Customers ORDER BY CustomerID;
-        """)
+        cur.execute("SELECT CustomerID, FullName, CompanyName, PhoneNumber, Email FROM Customers ORDER BY CustomerID;")
         return cur.fetchall()
-    finally:
-        cur.close()
+    finally: 
+        cur.close(); 
         conn.close()
 
 def check_login(login, password):
@@ -51,21 +46,16 @@ def check_login(login, password):
         cur.close()
         conn.close()
 
-def add_customer(full_name, company, phone, email, address):
-    """Добавляет нового клиента в базу данных."""
-    conn = get_connection()
-    cur = conn.cursor()
+def add_customer(full_name, company, phone, email):
+    conn = get_connection(); cur = conn.cursor()
     try:
-        cur.execute("""
-            INSERT INTO Customers (FullName, CompanyName, PhoneNumber, Email, ShippingAddress)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (full_name, company, phone, email, address))
+        cur.execute("INSERT INTO Customers (FullName, CompanyName, PhoneNumber, Email) VALUES (%s, %s, %s, %s)", 
+                    (full_name, company, phone, email))
         conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        cur.close()
+    except Exception as e: 
+        conn.rollback(); raise e
+    finally: 
+        cur.close(); 
         conn.close()
 
 def delete_customer(customer_id):
@@ -82,22 +72,16 @@ def delete_customer(customer_id):
         cur.close()
         conn.close()
 
-def update_customer(customer_id, full_name, company, phone, email, address):
-    """Обновляет данные существующего клиента."""
-    conn = get_connection()
-    cur = conn.cursor()
+def update_customer(customer_id, full_name, company, phone, email):
+    conn = get_connection(); cur = conn.cursor()
     try:
-        cur.execute("""
-            UPDATE Customers 
-            SET FullName = %s, CompanyName = %s, PhoneNumber = %s, Email = %s, ShippingAddress = %s
-            WHERE CustomerID = %s
-        """, (full_name, company, phone, email, address, customer_id))
+        cur.execute("UPDATE Customers SET FullName=%s, CompanyName=%s, PhoneNumber=%s, Email=%s WHERE CustomerID=%s", 
+                    (full_name, company, phone, email, customer_id))
         conn.commit()
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        cur.close()
+    except Exception as e: 
+        conn.rollback(); raise e
+    finally: 
+        cur.close(); 
         conn.close()
 
 def get_all_suppliers():
@@ -218,4 +202,102 @@ def delete_product(prod_id):
         cur.execute("DELETE FROM Products WHERE ProductID = %s", (prod_id,))
         conn.commit()
     except Exception as e: conn.rollback(); raise e
+    finally: cur.close(); conn.close()
+
+def get_customers_for_search():
+    """Получает клиентов для умного поиска (ID, Имя, Телефон, Email)"""
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        cur.execute("SELECT CustomerID, FullName, PhoneNumber, Email FROM Customers;")
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+def get_products_for_search():
+    """Получает товары для умного поиска и контроля остатков"""
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        # Вытаскиваем ID, Артикул, Название, Цену продажи, Остаток и Единицу измерения
+        cur.execute("SELECT ProductID, Article, ProductName, SalePrice, StockBalance, Unit FROM Products WHERE StockBalance > 0;")
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+def create_order_transaction(customer_id, seller_id, address, cart_items):
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        # ЗАМЕНИЛИ CURRENT_DATE на CURRENT_TIMESTAMP
+        cur.execute("""
+            INSERT INTO Orders (CustomerID, EmployeeID, OrderDate, Status, ShippingAddress) 
+            VALUES (%s, %s, CURRENT_TIMESTAMP, 'Новый', %s) RETURNING OrderID;
+        """, (customer_id, seller_id, address))
+        order_id = cur.fetchone()[0]
+
+        for item in cart_items:
+            cur.execute("""
+                INSERT INTO OrderItems (OrderID, ProductID, Quantity, PriceAtOrder) 
+                VALUES (%s, %s, %s, %s);
+            """, (order_id, item['product_id'], item['qty'], item['price']))
+            
+            cur.execute("UPDATE Products SET StockBalance = StockBalance - %s WHERE ProductID = %s;", 
+                        (item['qty'], item['product_id']))
+
+        conn.commit()
+        return order_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close(); conn.close()
+
+# ================= ЖУРНАЛ ЗАКАЗОВ =================
+def get_all_orders():
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        # ТУТ ИСПРАВИЛИ oi.Price на oi.PriceAtOrder
+        cur.execute("""
+            SELECT o.OrderID, o.OrderDate, o.Status,
+                   c.FullName AS Customer,
+                   e.FullName AS Seller,
+                   COALESCE(ce.FullName, 'Не назначен') AS Courier,
+                   COALESCE(SUM(oi.Quantity * oi.PriceAtOrder), 0) AS TotalSum
+            FROM Orders o
+            LEFT JOIN Customers c ON o.CustomerID = c.CustomerID
+            LEFT JOIN Employees e ON o.EmployeeID = e.EmployeeID
+            LEFT JOIN Employees ce ON o.CourierID = ce.EmployeeID
+            LEFT JOIN OrderItems oi ON o.OrderID = oi.OrderID
+            GROUP BY o.OrderID, c.FullName, e.FullName, ce.FullName
+            ORDER BY o.OrderID DESC;
+        """)
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+def get_order_details(order_id):
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT p.Article, p.ProductName, oi.PriceAtOrder, oi.Quantity, (oi.PriceAtOrder * oi.Quantity) AS Summa
+            FROM OrderItems oi
+            JOIN Products p ON oi.ProductID = p.ProductID
+            WHERE oi.OrderID = %s;
+        """, (order_id,))
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+def update_order_status(order_id, new_status):
+    """Обновляет статус заказа. Если заказ отменен - возвращает товары на склад."""
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        # Проверяем текущий статус, чтобы не вернуть товары дважды
+        cur.execute("SELECT Status FROM Orders WHERE OrderID = %s", (order_id,))
+        current_status = cur.fetchone()[0]
+
+        if new_status == 'Отменен' and current_status != 'Отменен':
+            # Фишка для курсовой: Транзакция возврата остатков
+            cur.execute("SELECT ProductID, Quantity FROM OrderItems WHERE OrderID = %s", (order_id,))
+            for p_id, qty in cur.fetchall():
+                cur.execute("UPDATE Products SET StockBalance = StockBalance + %s WHERE ProductID = %s", (qty, p_id))
+
+        cur.execute("UPDATE Orders SET Status = %s WHERE OrderID = %s", (new_status, order_id))
+        conn.commit()
+    except Exception as e: 
+        conn.rollback(); raise e
     finally: cur.close(); conn.close()
