@@ -359,3 +359,94 @@ def generate_unique_article():
     finally:
         cur.close()
         conn.close()
+
+# =====================================================================
+# БЛОК КУРЬЕРА (СТРОГО ПО ER-ДИАГРАММЕ)
+# =====================================================================
+def get_available_orders():
+    """Возвращает все оплаченные заказы, у которых еще нет курьера"""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT o.orderid, o.orderdate, c.fullname, o.shippingaddress
+            FROM orders o
+            JOIN customers c ON o.customerid = c.customerid
+            WHERE o.status = 'Оплачен' AND o.courierid IS NULL
+            ORDER BY o.orderid;
+        """)
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+def get_active_courier_order(courier_id):
+    """Возвращает текущий активный заказ курьера (статус 'В доставке')"""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT o.orderid, o.orderdate, c.fullname, c.phonenumber, o.shippingaddress
+            FROM orders o
+            JOIN customers c ON o.customerid = c.customerid
+            WHERE o.status = 'В доставке' AND o.courierid = %s
+            LIMIT 1;
+        """, (courier_id,))
+        return cur.fetchone()
+    finally:
+        cur.close()
+        conn.close()
+
+def get_order_items_details(order_id):
+    """Возвращает состав товаров для конкретного заказа: Артикул, ID, Название, Количество"""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Заменили orderdetails на orderitems и price на priceatorder
+        cur.execute("""
+            SELECT p.article, p.productid, p.productname, oi.quantity
+            FROM orderitems oi
+            JOIN products p ON oi.productid = p.productid
+            WHERE oi.orderid = %s
+            ORDER BY p.productid;
+        """, (order_id,))
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+def accept_order(order_id, courier_id):
+    """Привязать заказ к курьеру и перевести в статус 'В доставке'"""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE orders 
+            SET status = 'В доставке', courierid = %s 
+            WHERE orderid = %s AND status = 'Оплачен' AND courierid IS NULL;
+        """, (courier_id, order_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
+def complete_order(order_id):
+    """Перевести заказ в статус 'Доставлен'"""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE orders 
+            SET status = 'Доставлен' 
+            WHERE orderid = %s AND status = 'В доставке';
+        """, (order_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()

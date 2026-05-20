@@ -9,6 +9,7 @@ from windows.pages.page_employees import PageEmployees
 from windows.pages.page_products import PageProducts
 from windows.pages.page_orders import PageOrders
 from windows.pages.page_orders_history import PageOrdersHistory
+from windows.pages.page_courier import PageCourier
 
 class MainWindow(QMainWindow):
     def __init__(self, user_info):
@@ -88,10 +89,10 @@ class MainWindow(QMainWindow):
 
         # Добавляем модули на панель
         add_menu_item("🛒 Сборка заказа", PageOrders(user_info), [1, 2])
-        add_menu_item("📋 История заказов", PageOrdersHistory(user_info), [1, 2, 3])
+        add_menu_item("📋 История заказов", PageOrdersHistory(user_info), [1, 2])
         add_menu_item("👥 База клиентов", PageCustomers(), [1, 2])
         add_menu_item("📦 Каталог товаров", PageProducts(), [1, 2])
-        add_menu_item("🚚 Доставки", QLabel("Тут будет панель курьера"), [1, 3]) 
+        add_menu_item("🚚 Доставки курьера", PageCourier(user_info), [1, 3])
         add_menu_item("🏭 Поставщики", PageSuppliers(), [1]) 
         add_menu_item("👥 Сотрудники", PageEmployees(), [1])
 
