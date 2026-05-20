@@ -450,3 +450,125 @@ def complete_order(order_id):
     finally:
         cur.close()
         conn.close()
+
+def get_analytics_kpis(start_date, end_date):
+    """Считает расширенный список KPI: Выручку, Прибыль, Процент выполнения, Средний чек и Число заказов."""
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        # 1. Выручка (только по успешным/активным заказам)
+        cur.execute("""
+            SELECT COALESCE(SUM(totalamount), 0) FROM orders 
+            WHERE status IN ('Оплачен', 'В доставке', 'Доставлен') 
+              AND orderdate::date BETWEEN %s AND %s;
+        """, (start_date, end_date))
+        revenue = float(cur.fetchone()[0])
+
+        # 2. Чистая прибыль (Выручка - Закупка)
+        cur.execute("""
+            SELECT COALESCE(SUM((oi.priceatorder - p.purchaseprice) * oi.quantity), 0)
+            FROM orderitems oi
+            JOIN products p ON oi.productid = p.productid
+            JOIN orders o ON oi.orderid = o.orderid
+            WHERE o.status IN ('Оплачен', 'В доставке', 'Доставлен')
+              AND o.orderdate::date BETWEEN %s AND %s;
+        """, (start_date, end_date))
+        profit = float(cur.fetchone()[0])
+
+        # 3. Процент успешных доставок
+        cur.execute("""
+            SELECT 
+                COUNT(CASE WHEN status = 'Доставлен' THEN 1 END)::float / 
+                NULLIF(COUNT(CASE WHEN status IN ('Доставлен', 'Отменен') THEN 1 END), 0) * 100
+            FROM orders WHERE orderdate::date BETWEEN %s AND %s;
+        """, (start_date, end_date))
+        res = cur.fetchone()[0]
+        rate = round(res, 1) if res is not None else 0.0
+
+        # 4. Средний чек (Новая метрика)
+        cur.execute("""
+            SELECT COALESCE(AVG(totalamount), 0) FROM orders 
+            WHERE status IN ('Оплачен', 'В доставке', 'Доставлен') 
+              AND orderdate::date BETWEEN %s AND %s;
+        """, (start_date, end_date))
+        avg_check = float(cur.fetchone()[0])
+
+        # 5. Всего оформлено заказов (Новая метрика)
+        cur.execute("""
+            SELECT COUNT(*) FROM orders 
+            WHERE orderdate::date BETWEEN %s AND %s;
+        """, (start_date, end_date))
+        total_orders = int(cur.fetchone()[0])
+
+        return revenue, profit, rate, avg_check, total_orders
+    finally: 
+        cur.close(); conn.close()
+
+def get_top_products(start_date, end_date):
+    """Возвращает Топ-5 продаваемых товаров за период."""
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT p.article, p.productname, SUM(oi.quantity), SUM(oi.quantity * oi.priceatorder) as total
+            FROM orderitems oi
+            JOIN products p ON oi.productid = p.productid
+            JOIN orders o ON oi.orderid = o.orderid
+            WHERE o.status IN ('Оплачен', 'В доставке', 'Доставлен')
+              AND o.orderdate::date BETWEEN %s AND %s
+            GROUP BY p.productid, p.article, p.productname
+            ORDER BY total DESC LIMIT 5;
+        """, (start_date, end_date))
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+def get_sales_trend(start_date, end_date):
+    """Возвращает посуточную выручку и чистую прибыль для комплексных графиков."""
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT o.orderdate::date as day, 
+                   COALESCE(SUM(o.totalamount), 0) as daily_revenue,
+                   COALESCE(SUM((oi.priceatorder - p.purchaseprice) * oi.quantity), 0) as daily_profit
+            FROM orders o
+            LEFT JOIN orderitems oi ON o.orderid = oi.orderid
+            LEFT JOIN products p ON oi.productid = p.productid
+            WHERE o.status IN ('Оплачен', 'В доставке', 'Доставлен')
+              AND o.orderdate::date BETWEEN %s AND %s
+            GROUP BY day ORDER BY day;
+        """, (start_date, end_date))
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+def get_order_status_distribution(start_date, end_date):
+    """Возвращает количество заказов по каждому статусу за указанный период."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT status, COUNT(*) 
+            FROM orders 
+            WHERE orderdate::date BETWEEN %s AND %s
+            GROUP BY status;
+        """, (start_date, end_date))
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+def get_top_sellers_rating(start_date, end_date):
+    """Возвращает топ продавцов (сотрудников) по объему выручки за период."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT e.fullname, COALESCE(SUM(o.totalamount), 0) as total_sales
+            FROM orders o
+            JOIN employees e ON o.employeeid = e.employeeid
+            WHERE o.status IN ('Оплачен', 'В доставке', 'Доставлен')
+              AND o.orderdate::date BETWEEN %s AND %s
+            GROUP BY e.employeeid, e.fullname
+            ORDER BY total_sales ASC LIMIT 5; 
+        """, (start_date, end_date))
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()

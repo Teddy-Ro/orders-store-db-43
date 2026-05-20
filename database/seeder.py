@@ -1,127 +1,141 @@
 import random
+import math
+from datetime import datetime, timedelta
 from faker import Faker
 from .connection import get_connection
 
-# Указываем русскую локаль, чтобы данные выглядели как настоящие
 fake = Faker('ru_RU')
 
-def generate_fake_data():
-    """Генерирует тестовые данные и заполняет все таблицы."""
+def generate_fake_data(num_customers=30, num_suppliers=10, num_products=40, days_of_history=120):
+    """Генерирует тестовые данные строго по физической ER-схеме PostgreSQL."""
     conn = get_connection()
     cur = conn.cursor()
     
     try:
-        # 1. Очищаем старые данные (чтобы при повторном нажатии база не пухла)
-        cur.execute("TRUNCATE TABLE OrderItems, Orders, Documents, Products, Employees, Customers, Suppliers RESTART IDENTITY CASCADE;")
+        # 1. Очистка таблиц каскадом 
+        cur.execute("TRUNCATE TABLE orderitems, orders, documents, products, employees, customers, suppliers RESTART IDENTITY CASCADE;")
         
-        # 2. Генерируем Сотрудников (5 человек)
-        print("Генерация сотрудников...")
-        for _ in range(5):
-            cur.execute("""
-                INSERT INTO Employees (FullName, Position, Login, Password, AccessLevel)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                fake.name(), 
-                random.choice(["Менеджер", "Старший менеджер", "Оператор"]),
-                fake.unique.user_name(), 
-                "password123", # Заглушка для пароля
-                random.randint(1, 3)
-            ))
-
-        # 3. Генерируем Поставщиков (10 компаний)
-        print("Генерация поставщиков...")
-        for _ in range(10):
-            cur.execute("""
-                INSERT INTO Suppliers (CompanyName, ContactPerson, PhoneNumber, Details)
-                VALUES (%s, %s, %s, %s)
-            """, (fake.company(), fake.name(), fake.phone_number(), fake.catch_phrase()))
-
-        # 4. Генерируем Клиентов (20 человек/компаний)
-        print("Генерация клиентов...")
-        for _ in range(20):
-            cur.execute("""
-                INSERT INTO Customers (FullName, CompanyName, PhoneNumber, Email, ShippingAddress)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                fake.name(), 
-                fake.company() if random.choice([True, False]) else None, 
-                fake.phone_number(), 
-                fake.email(), 
-                fake.address()
-            ))
-
-        # 5. Генерируем Товары (30 штук)
-        print("Генерация товаров...")
-        # Получаем ID поставщиков, чтобы привязать к ним товары
-        cur.execute("SELECT SupplierID FROM Suppliers;")
-        supplier_ids = [row[0] for row in cur.fetchall()]
+        # 2. Сотрудники (Админ, Продавцы, Курьеры)
+        cur.execute("INSERT INTO employees (fullname, position, login, password, accesslevel) VALUES ('Иванов А.Д.', 'Управляющий', 'admin', 'admin', 1);")
         
-        for _ in range(30):
-            purchase_price = round(random.uniform(100.0, 5000.0), 2)
-            sale_price = round(purchase_price * random.uniform(1.2, 2.0), 2) # Наценка 20-100%
-            cur.execute("""
-                INSERT INTO Products (Article, ProductName, Description, PurchasePrice, SalePrice, UnitOfMeasurement, ExpirationDate, StockBalance, SupplierID)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                fake.unique.bothify(text='ART-#####'), # Уникальный артикул
-                fake.word().capitalize(),
-                fake.sentence(),
-                purchase_price,
-                sale_price,
-                random.choice(["шт", "кг", "упак", "литр"]),
-                fake.future_date(end_date="+1y") if random.choice([True, False]) else None,
-                random.randint(0, 1000),
-                random.choice(supplier_ids)
-            ))
-
-        # 6. Генерируем Заказы и их Состав (50 заказов)
-        print("Генерация заказов...")
-        cur.execute("SELECT CustomerID FROM Customers;")
-        customer_ids = [row[0] for row in cur.fetchall()]
-        
-        cur.execute("SELECT EmployeeID FROM Employees;")
-        employee_ids = [row[0] for row in cur.fetchall()]
-        
-        cur.execute("SELECT ProductID, SalePrice FROM Products;")
-        products = cur.fetchall() # Список кортежей (ID, Цена)
-
-        for _ in range(50):
-            # Создаем пустой заказ
-            cur.execute("""
-                INSERT INTO Orders (OrderDate, Status, CustomerID, EmployeeID)
-                VALUES (%s, %s, %s, %s) RETURNING OrderID;
-            """, (
-                fake.date_time_between(start_date="-1y", end_date="now"),
-                random.choice(["Новый", "В обработке", "Отправлен", "Доставлен", "Отменен"]),
-                random.choice(customer_ids),
-                random.choice(employee_ids)
-            ))
-            order_id = cur.fetchone()[0]
-
-            # Наполняем заказ товарами (от 1 до 5 разных товаров)
-            order_total = 0
-            items_count = random.randint(1, 5)
-            selected_products = random.sample(products, items_count) # Берем уникальные товары для заказа
+        seller_ids = []
+        for _ in range(3):
+            cur.execute("INSERT INTO employees (fullname, position, login, password, accesslevel) VALUES (%s, 'Продавец', %s, '123', 2) RETURNING employeeid;",
+                        (fake.name(), fake.unique.user_name()))
+            seller_ids.append(cur.fetchone()[0])
             
-            for prod_id, price in selected_products:
-                qty = random.randint(1, 10)
-                order_total += price * qty
+        courier_ids = []
+        for _ in range(3):
+            cur.execute("INSERT INTO employees (fullname, position, login, password, accesslevel) VALUES (%s, 'Курьер', %s, '123', 3) RETURNING employeeid;",
+                        (fake.name(), fake.unique.user_name()))
+            courier_ids.append(cur.fetchone()[0])
+
+        # 3. Поставщики
+        supplier_ids = []
+        for _ in range(max(2, num_suppliers)):
+            cur.execute("INSERT INTO suppliers (companyname, contactperson, phonenumber, details) VALUES (%s, %s, %s, %s) RETURNING supplierid;",
+                        (fake.company(), fake.name(), fake.phone_number(), fake.catch_phrase()))
+            supplier_ids.append(cur.fetchone()[0])
+
+        # 4. ИСПРАВЛЕНО: Клиенты создаются СТРОГО по схеме (без shippingaddress!)
+        customer_ids = []
+        for _ in range(max(5, num_customers)):
+            cur.execute("INSERT INTO customers (fullname, companyname, phonenumber, email) VALUES (%s, %s, %s, %s) RETURNING customerid;",
+                        (fake.name(), fake.company() if random.choice([True, False]) else None, fake.phone_number(), fake.email()))
+            customer_ids.append(cur.fetchone()[0])
+
+        # 5. Товары (Используем колонку unitofmeasurement из create_tables.sql)
+        product_pool = []
+        for i in range(max(5, num_products)):
+            p_price = round(random.uniform(100.0, 3500.0), 2)
+            s_price = round(p_price * random.uniform(1.2, 1.7), 2)
+            
+            cur.execute("""
+                INSERT INTO products (article, productname, description, purchaseprice, saleprice, unitofmeasurement, stockbalance, supplierid)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING productid;
+            """, (
+                f"ART-{random.randint(10000, 99999)}",
+                fake.word().capitalize() + " " + random.choice(["Органик", "Импорт", "Люкс", "Классик"]),
+                fake.sentence(), p_price, s_price, random.choice(["шт", "кг", "упак", "литр"]),
+                random.randint(30, 300), random.choice(supplier_ids)
+            ))
+            prod_id = cur.fetchone()[0]
+            
+            # Закон Парето для реализма аналитики
+            weight = 120 if i < 4 else random.randint(2, 12)
+            product_pool.append((prod_id, s_price, weight))
+
+        # 6. Заказы (Адрес доставки пишется СЮДА)
+        start_date = datetime.now() - timedelta(days=days_of_history)
+        prod_ids_list = [p[0] for p in product_pool]
+        prod_prices_dict = {p[0]: p[1] for p in product_pool}
+        prod_weights = [p[2] for p in product_pool]
+
+        for day_offset in range(days_of_history):
+            current_date = start_date + timedelta(days=day_offset)
+            base_orders = random.randint(1, 2)
+            trend_bonus = math.floor(day_offset / 30) 
+            
+            for _ in range(base_orders + trend_bonus):
+                days_ago = (datetime.now() - current_date).days
+                if days_ago > 3:
+                    status = "Отменен" if random.random() < 0.12 else "Доставлен"
+                else:
+                    status = random.choice(["Новый", "Оплачен", "В доставке", "Доставлен"])
+
+                courier_id = random.choice(courier_ids) if status in ["В доставке", "Доставлен"] else None
+
                 cur.execute("""
-                    INSERT INTO OrderItems (OrderID, ProductID, Quantity, PriceAtOrder)
-                    VALUES (%s, %s, %s, %s)
-                """, (order_id, prod_id, qty, price))
-            
-            # Обновляем общую сумму заказа (TotalAmount)
-            cur.execute("""
-                UPDATE Orders SET TotalAmount = %s WHERE OrderID = %s
-            """, (order_total, order_id))
+                    INSERT INTO orders (orderdate, status, totalamount, customerid, employeeid, shippingaddress, courierid)
+                    VALUES (%s, %s, 0.00, %s, %s, %s, %s) RETURNING orderid;
+                """, (
+                    current_date + timedelta(hours=random.randint(8, 20), minutes=random.randint(0, 59)),
+                    status, random.choice(customer_ids), random.choice(seller_ids), fake.address(), courier_id
+                ))
+                order_id = cur.fetchone()[0]
 
-        # Сохраняем все изменения в БД
+                order_total = 0
+                items_count = random.randint(1, 4)
+                chosen_products = list(set(random.choices(prod_ids_list, weights=prod_weights, k=items_count)))
+
+                for p_id in chosen_products:
+                    qty = random.randint(1, 3)
+                    price = prod_prices_dict[p_id]
+                    order_total += price * qty
+                    
+                    cur.execute("""
+                        INSERT INTO orderitems (orderid, productid, quantity, priceatorder)
+                        VALUES (%s, %s, %s, %s);
+                    """, (order_id, p_id, qty, price))
+
+                cur.execute("UPDATE orders SET totalamount = %s WHERE orderid = %s;", (order_total, order_id))
+
         conn.commit()
-        print("Генерация успешно завершена!")
-
+        print("Параметризованный сидинг успешно выполнен.")
     except Exception as e:
-        conn.rollback() # Откат при ошибке
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
+def clear_database_completely():
+    """Полностью удаляет все данные из БД, оставляя только одну дефолтную учетную запись админа."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Очищаем все таблицы каскадом с перезапуском автоинкрементных счетчиков (IDENTITY)
+        cur.execute("TRUNCATE TABLE orderitems, orders, documents, products, employees, customers, suppliers RESTART IDENTITY CASCADE;")
+        
+        # Сразу создаем базового администратора, чтобы сессия авторизации не ломалась
+        cur.execute("""
+            INSERT INTO employees (fullname, position, login, password, accesslevel) 
+            VALUES ('Иванов А.Д.', 'Управляющий', 'admin', 'admin', 1);
+        """)
+        conn.commit()
+        print("База данных успешно полностью очищена!")
+    except Exception as e:
+        conn.rollback()
         raise e
     finally:
         cur.close()

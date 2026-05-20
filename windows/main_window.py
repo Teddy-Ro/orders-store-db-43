@@ -10,6 +10,8 @@ from windows.pages.page_products import PageProducts
 from windows.pages.page_orders import PageOrders
 from windows.pages.page_orders_history import PageOrdersHistory
 from windows.pages.page_courier import PageCourier
+from windows.pages.page_analytics import PageAnalytics
+from windows.pages.page_developer import PageDeveloper
 
 class MainWindow(QMainWindow):
     def __init__(self, user_info):
@@ -55,8 +57,10 @@ class MainWindow(QMainWindow):
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(10, 20, 10, 20)
 
-        lbl_profile = QLabel(f"👤 {self.user_name}\n🔑 {self.user_position}")
+        lbl_profile = QLabel(f"{self.user_name}\n\n{self.user_position}")
         lbl_profile.setStyleSheet("font-weight: bold; margin-bottom: 20px; border: none;")
+        lbl_profile.setWordWrap(True)
+
         sidebar_layout.addWidget(lbl_profile)
 
         self.content_stack = QStackedWidget()
@@ -95,6 +99,8 @@ class MainWindow(QMainWindow):
         add_menu_item("🚚 Доставки курьера", PageCourier(user_info), [1, 3])
         add_menu_item("🏭 Поставщики", PageSuppliers(), [1]) 
         add_menu_item("👥 Сотрудники", PageEmployees(), [1])
+        add_menu_item("📊 Аналитика и отчеты", PageAnalytics(), [1])
+        add_menu_item("🛠 Панель разработчика", PageDeveloper(), [1])
 
         sidebar_layout.addStretch()
 
