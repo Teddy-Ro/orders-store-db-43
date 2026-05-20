@@ -174,31 +174,39 @@ class PageOrdersHistory(QWidget):
         menu = QMenu()
         menu.setStyleSheet("QMenu { font-size: 13px; }")
         
-        if current_status != 'Отменен':
-            act_new = menu.addAction("🔵 Перевести в 'Новый'")
-            act_pay = menu.addAction("🟢 Перевести в 'Оплачен'")
-            act_del = menu.addAction("🟡 Перевести в 'В доставке'")
-            act_done = menu.addAction("🏁 Перевести в 'Доставлен'")
-            menu.addSeparator()
-            act_cancel = menu.addAction("❌ Отменить заказ (вернуть остатки)")
+        # БЛОКИРОВКА: Если заказ отменен ИЛИ уже успешно доставлен — меню не создаем
+        if current_status == 'Отменен':
+            QMessageBox.information(self, "Информация", "Этот заказ отменен. Изменение статуса невозможно.")
+            return
+        elif current_status == 'Доставлен':
+            QMessageBox.information(self, "Информация", "Этот заказ уже успешно доставлен. Изменение статуса заблокировано.")
+            return
             
-            action = menu.exec(self.table_orders.viewport().mapToGlobal(pos))
-            
-            new_status = None
-            if action == act_new: new_status = "Новый"
-            elif action == act_pay: new_status = "Оплачен"
-            elif action == act_del: new_status = "В доставке"
-            elif action == act_done: new_status = "Доставлен"
-            elif action == act_cancel:
-                reply = QMessageBox.question(self, 'Отмена', "Точно отменить заказ? Товары вернутся на склад.",
-                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                if reply == QMessageBox.StandardButton.Yes:
-                    new_status = "Отменен"
+        # Для всех остальных промежуточных статусов ('Новый', 'Оплачен', 'В доставке') генерируем меню:
+        act_new = menu.addAction("🔵 Перевести в 'Новый'")
+        act_pay = menu.addAction("🟢 Перевести в 'Оплачен'")
+        act_del = menu.addAction("🟡 Перевести в 'В доставке'")
+        act_done = menu.addAction("🏁 Перевести в 'Доставлен'")
+        menu.addSeparator()
+        act_cancel = menu.addAction("❌ Отменить заказ (вернуть остатки)")
+        
+        action = menu.exec(self.table_orders.viewport().mapToGlobal(pos))
+        
+        new_status = None
+        if action == act_new: new_status = "Новый"
+        elif action == act_pay: new_status = "Оплачен"
+        elif action == act_del: new_status = "В доставке"
+        elif action == act_done: new_status = "Доставлен"
+        elif action == act_cancel:
+            reply = QMessageBox.question(self, 'Отмена', "Точно отменить заказ? Товары вернутся на склад.",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                new_status = "Отменен"
 
-            if new_status and new_status != current_status:
-                try:
-                    update_order_status(order_id, new_status)
-                    self.load_orders()
-                    self.in_search.clear() # Очищаем поиск при смене статуса
-                except Exception as e:
-                    QMessageBox.critical(self, "Ошибка БД", f"Не удалось изменить статус:\n{e}")
+        if new_status and new_status != current_status:
+            try:
+                update_order_status(order_id, new_status)
+                self.load_orders()
+                self.in_search.clear() # Очищаем поиск при смене статуса
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка БД", f"Не удалось изменить статус:\n{e}")
