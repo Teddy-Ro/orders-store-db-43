@@ -1,4 +1,6 @@
 import os
+import random
+import string
 from .connection import get_connection
 
 def init_database():
@@ -174,27 +176,59 @@ def delete_employee(emp_id):
 
 # ================= ТОВАРЫ =================
 def get_all_products():
-    conn = get_connection(); cur = conn.cursor()
+    conn = get_connection()
+    cur = conn.cursor()
     try:
-        cur.execute("SELECT ProductID, Article, ProductName, PurchasePrice, SalePrice, StockBalance, SupplierID FROM Products ORDER BY ProductID;")
+        # Запрос строго по твоей схеме: убрали category
+        cur.execute("""
+            SELECT productid, article, productname, purchaseprice, saleprice, stockbalance, 
+                   unit, description, supplierid 
+            FROM products ORDER BY productid;
+        """)
         return cur.fetchall()
-    finally: cur.close(); conn.close()
+    finally:
+        cur.close()
+        conn.close()
 
-def add_product(art, name, p_price, s_price, stock, sup_id):
-    conn = get_connection(); cur = conn.cursor()
+def add_product(art, name, p_price, s_price, stock, unit, supplier_id, description):
+    conn = get_connection()
+    cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO Products (Article, ProductName, PurchasePrice, SalePrice, StockBalance, SupplierID) VALUES (%s, %s, %s, %s, %s, %s)", (art, name, p_price, s_price, stock, sup_id))
+        if not art or art.strip() == "":
+            art = generate_unique_article()
+            
+        cur.execute("""
+            INSERT INTO products (article, productname, purchaseprice, saleprice, stockbalance, unit, supplierid, description) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+        """, (art, name, p_price, s_price, stock, unit, supplier_id, description))
         conn.commit()
-    except Exception as e: conn.rollback(); raise e
-    finally: cur.close(); conn.close()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
 
-def update_product(prod_id, art, name, p_price, s_price, stock, sup_id):
-    conn = get_connection(); cur = conn.cursor()
+def update_product(prod_id, art, name, p_price, s_price, stock, unit, supplier_id, description):
+    conn = get_connection()
+    cur = conn.cursor()
     try:
-        cur.execute("UPDATE Products SET Article=%s, ProductName=%s, PurchasePrice=%s, SalePrice=%s, StockBalance=%s, SupplierID=%s WHERE ProductID=%s", (art, name, p_price, s_price, stock, sup_id, prod_id))
+        if not art or art.strip() == "":
+            art = generate_unique_article()
+            
+        cur.execute("""
+            UPDATE products 
+            SET article=%s, productname=%s, purchaseprice=%s, saleprice=%s, stockbalance=%s, 
+                unit=%s, supplierid=%s, description=%s 
+            WHERE productid=%s;
+        """, (art, name, p_price, s_price, stock, unit, supplier_id, description, prod_id))
         conn.commit()
-    except Exception as e: conn.rollback(); raise e
-    finally: cur.close(); conn.close()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
 
 def delete_product(prod_id):
     conn = get_connection(); cur = conn.cursor()
@@ -301,3 +335,27 @@ def update_order_status(order_id, new_status):
     except Exception as e: 
         conn.rollback(); raise e
     finally: cur.close(); conn.close()
+
+def get_suppliers_for_dropdown():
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT supplierid, companyname FROM suppliers ORDER BY companyname;")
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+def generate_unique_article():
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        while True:
+            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+            article = f"PRD-{suffix}"
+            cur.execute("SELECT 1 FROM products WHERE article = %s;", (article,))
+            if not cur.fetchone():
+                return article
+    finally:
+        cur.close()
+        conn.close()

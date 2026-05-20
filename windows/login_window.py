@@ -43,7 +43,7 @@ class LoginWindow(QDialog):
         password = self.txt_password.text().strip()
 
         # Хардкодный KISS-вариант для тестов (если база пустая или лень искать логин из Faker)
-        if login == "a" and password == "":
+        if login == "" and password == "":
             self.user_info = (0, "Главный Администратор", 1, "Разработчик")
             self.accept()
             return

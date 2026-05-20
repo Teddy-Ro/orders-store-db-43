@@ -61,7 +61,7 @@ class CustomerDialog(QDialog):
         if phone:
             # Разрешаем цифры, плюсы, минусы, скобки и пробелы
             phone_pattern = re.compile(r'^[\+\(\)\s\-0-9]+$')
-            if not phone_pattern.match(phone) or len(phone) < 5:
+            if not phone_pattern.match(phone) or len(phone) < 3:
                 QMessageBox.warning(self, "Внимание", "Некорректный формат телефона!\nРазрешены только цифры и знаки +, -, ().")
                 self.in_phone.setFocus()
                 return
