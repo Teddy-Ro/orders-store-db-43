@@ -1,8 +1,11 @@
 import sys
 import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
-                             QFrame, QStackedWidget, QLabel, QPushButton, QButtonGroup)
+                             QFrame, QStackedWidget, QLabel, QPushButton, QButtonGroup, QApplication)
 from PyQt6.QtCore import Qt
+
+from styles.themes import get_theme_stylesheet
+
 from windows.pages.page_customers import PageCustomers
 from windows.pages.page_suppliers import PageSuppliers
 from windows.pages.page_employees import PageEmployees
@@ -21,77 +24,59 @@ class MainWindow(QMainWindow):
         self.resize(1100, 650)
         self.is_logged_out = False
 
+        # --- АВТОМАТИЧЕСКОЕ ОПРЕДЕЛЕНИЕ СИСТЕМНОЙ ТЕМЫ ОС ---
+        is_os_dark = QApplication.instance().palette().window().color().value() < 128
+        self.current_theme = "dark" if is_os_dark else "light"
+
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QHBoxLayout(main_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # ==================== ЛЕВАЯ ПАНЕЛЬ ====================
+        # ==================== ЛЕВАЯ ПАНЕЛЬ (САЙДБАР) ====================
         sidebar = QFrame()
+        sidebar.setObjectName("sidebar")  # Связываем объект с селектором в styles/themes.py
         sidebar.setFixedWidth(220)
         
-        # Настройка стилей сайдбара с учетом активного (checked) состояния кнопок
-        sidebar.setStyleSheet("""
-            QFrame { 
-                border-right: 1px solid gray; 
-            } 
-            QPushButton { 
-                text-align: left; 
-                padding: 8px 8px 8px 12px; 
-                border: none; 
-                font-size: 14px; 
-            } 
-            QPushButton:hover { 
-                background-color: rgba(128, 128, 128, 0.15); 
-                border-radius: 4px; 
-            } 
-            QPushButton:checked { 
-                background-color: rgba(128, 128, 128, 0.25); 
-                font-weight: bold; 
-                border-left: 4px solid gray; 
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
-            }
-        """)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(10, 20, 10, 20)
 
+        # Отображение профиля с автоматическим переносом длинных ФИО
         lbl_profile = QLabel(f"{self.user_name}\n\n{self.user_position}")
-        lbl_profile.setStyleSheet("font-weight: bold; margin-bottom: 20px; border: none;")
+        lbl_profile.setStyleSheet("font-weight: bold; border: none;")
         lbl_profile.setWordWrap(True)
-
         sidebar_layout.addWidget(lbl_profile)
+        sidebar_layout.addSpacing(30)
 
         self.content_stack = QStackedWidget()
         self.content_stack.setStyleSheet("border: none;")
 
-        # Создаем эксклюзивную группу кнопок для автоматического переключения подсветки
+        # Эксклюзивная группа для автоматического управления фокусом кнопок меню
         self.menu_group = QButtonGroup(self)
         self.menu_group.setExclusive(True)
 
-        # Приветственная страница (Индекс 0)
+        # Приветственный экран (Индекс 0)
         page_welcome = QWidget()
         lbl_w = QLabel("Выберите раздел в меню слева", page_welcome)
         lbl_w.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_w.setStyleSheet("font-size: 14px; color: gray;")
         QVBoxLayout(page_welcome).addWidget(lbl_w)
         self.content_stack.addWidget(page_welcome)
 
-        # --- ФУНКЦИЯ ДОБАВЛЕНИЯ РАЗДЕЛОВ ---
+        # --- ДИНАМИЧЕСКОЕ ДОБАВЛЕНИЕ СТРАНИЦ ПО ПРАВАМ ДОСТУПА ---
         def add_menu_item(title, widget, allowed_levels):
             if self.access_level in allowed_levels:
                 idx = self.content_stack.addWidget(widget)
                 
                 btn = QPushButton(title)
-                btn.setCheckable(True) # Делаем кнопку фиксируемой
-                
-                # Привязываем клик к смене страницы
+                btn.setCheckable(True)
                 btn.clicked.connect(lambda ch, i=idx: self.content_stack.setCurrentIndex(i))
                 
                 self.menu_group.addButton(btn)
                 sidebar_layout.addWidget(btn)
 
-        # Добавляем модули на панель
+        # Наполнение модулей ERP системы
         add_menu_item("🛒 Сборка заказа", PageOrders(user_info), [1, 2])
         add_menu_item("📋 История заказов", PageOrdersHistory(user_info), [1, 2])
         add_menu_item("👥 База клиентов", PageCustomers(), [1, 2])
@@ -102,18 +87,40 @@ class MainWindow(QMainWindow):
         add_menu_item("📊 Аналитика и отчеты", PageAnalytics(), [1])
         add_menu_item("🛠 Панель разработчика", PageDeveloper(), [1])
 
+        # Прижимаем элементы управления темой и выходом к самому низу панели
         sidebar_layout.addStretch()
 
-        self.btn_logout = QPushButton("🚪 Выйти")
-        # Кнопку выхода не добавляем в общую группу, чтобы она не сбрасывала подсветку вкладок
-        self.btn_logout.setStyleSheet("QPushButton:checked { border-left: none; }") 
+        # === КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ (ТЁМНАЯ / СВЕТЛАЯ) ===
+        self.btn_theme = QPushButton("🌓 Сменить тему")
+        # Не добавляем в QButtonGroup, чтобы клик не сбрасывал активную вкладку меню
+        self.btn_theme.clicked.connect(self.toggle_theme)
+        sidebar_layout.addWidget(self.btn_theme)
+
+        # КНОПКА ВЫХОДА ИЗ СИСТЕМЫ
+        self.btn_logout = QPushButton("Выйти из системы")
         self.btn_logout.clicked.connect(self.logout)
         sidebar_layout.addWidget(self.btn_logout)
 
         main_layout.addWidget(sidebar)
         main_layout.addWidget(self.content_stack)
 
+        # Применяем стартовую (проинициализированную) тему оформления
+        self.apply_theme()
+
+    def apply_theme(self):
+        """Запрашивает актуальный стиль из styles.themes и мгновенно перерисовывает все окна"""
+        qss_style = get_theme_stylesheet(self.current_theme)
+        QApplication.instance().setStyleSheet(qss_style)
+
+    def toggle_theme(self):
+        """Циклически меняет флаг темы и обновляет графический интерфейс"""
+        if self.current_theme == "dark":
+            self.current_theme = "light"
+        else:
+            self.current_theme = "dark"
+        self.apply_theme()
+
     def logout(self):
-        """Полный перезапуск приложения для смены пользователя"""
+        """Полный безопасный перезапуск приложения для смены пользователя"""
         self.close()
         os.execl(sys.executable, sys.executable, *sys.argv)

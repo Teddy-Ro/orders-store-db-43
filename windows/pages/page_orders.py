@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
                              QTableWidget, QTableWidgetItem, QMessageBox, QComboBox, 
-                             QLineEdit, QSpinBox, QHeaderView, QFrame, QFormLayout, QMenu, QAbstractItemView, QCompleter)
+                             QLineEdit, QSpinBox, QHeaderView, QFrame, QFormLayout, QMenu, QAbstractItemView, QCompleter, QGroupBox)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from database.queries import get_customers_for_search, get_products_for_search, create_order_transaction
 from windows.dialogs.customer_dialog import CustomerDialog
 
@@ -11,19 +12,23 @@ class PageOrders(QWidget):
         self.seller_id = user_info[0] 
         self.cart_items = {} 
 
+        # Главный вертикальный слой страницы с хорошими отступами
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
 
-        # ==========================================
-        # ЗОНА 1: Клиент и Адрес
-        # ==========================================
-        lbl_title_1 = QLabel("👤 ДАННЫЕ КЛИЕНТА И ДОСТАВКИ")
-        lbl_title_1.setStyleSheet("color: #a6adc8; font-weight: bold; font-size: 11px;")
-        layout.addWidget(lbl_title_1)
+        # =====================================================================
+        # ЗОНА 1: КАРТОЧКА КЛИЕНТА И ДОСТАВКИ
+        # =====================================================================
+        box_client = QGroupBox("👤 Данные клиента и доставки")
+        box_client.setStyleSheet("QGroupBox { font-weight: bold; }")
+        layout_client_box = QVBoxLayout(box_client)
+        layout_client_box.setContentsMargins(15, 15, 15, 15)
 
-        client_layout = QHBoxLayout()
-        
+        client_inner_layout = QHBoxLayout()
         form_client = QFormLayout()
+        form_client.setSpacing(10)
+
         self.combo_name = QComboBox()
         self.combo_phone = QComboBox()
         self.combo_email = QComboBox()
@@ -31,14 +36,13 @@ class PageOrders(QWidget):
 
         for combo in [self.combo_name, self.combo_phone, self.combo_email]:
             combo.setEditable(True)
-            combo.setMinimumWidth(250)
+            combo.setMinimumWidth(280)
             combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
             
-            # Стабильный Google-style поиск без кастомных рендереров (чистый Qt)
             completer = combo.completer()
             if completer:
-                completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion) # Всплывающее меню строго снизу
-                completer.setFilterMode(Qt.MatchFlag.MatchContains) # Ищет по любой части строки
+                completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+                completer.setFilterMode(Qt.MatchFlag.MatchContains)
                 completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             
             combo.activated.connect(self.sync_client_combos)
@@ -46,39 +50,42 @@ class PageOrders(QWidget):
         self.combo_name.setPlaceholderText("Поиск по ФИО...")
         self.combo_phone.setPlaceholderText("Поиск по телефону...")
         self.combo_email.setPlaceholderText("Поиск по Email...")
-        self.in_address.setPlaceholderText("Укажите адрес доставки для этого заказа...")
+        self.in_address.setPlaceholderText("Укажите точный адрес доставки для этого заказа...")
 
-        form_client.addRow("ФИО:", self.combo_name)
+        form_client.addRow("ФИО клиента:", self.combo_name)
         form_client.addRow("Телефон:", self.combo_phone)
         form_client.addRow("Email:", self.combo_email)
-        form_client.addRow("Адрес:", self.in_address)
-        client_layout.addLayout(form_client)
+        form_client.addRow("Адрес доставки:", self.in_address)
+        client_inner_layout.addLayout(form_client)
 
         vbox_new_client = QVBoxLayout()
         self.btn_new_client = QPushButton("➕ Новый клиент")
+        self.btn_new_client.setObjectName("action_btn")
+        self.btn_new_client.setFixedWidth(150)
         self.btn_new_client.clicked.connect(self.add_new_client)
         vbox_new_client.addWidget(self.btn_new_client)
         vbox_new_client.addStretch()
-        client_layout.addLayout(vbox_new_client)
+        client_inner_layout.addLayout(vbox_new_client)
         
-        client_layout.addStretch()
-        layout.addLayout(client_layout)
+        client_inner_layout.addStretch()
+        layout_client_box.addLayout(client_inner_layout)
+        layout.addWidget(box_client)
 
-        line1 = QFrame(); line1.setFrameShape(QFrame.Shape.HLine); line1.setStyleSheet("color: #313244;")
-        layout.addWidget(line1)
+        # =====================================================================
+        # ЗОНА 2: КАРТОЧКА ВЫБОРА ТОВАРОВ
+        # =====================================================================
+        box_product = QGroupBox("📦 Подбор товаров в корзину")
+        box_product.setStyleSheet("QGroupBox { font-weight: bold; }")
+        layout_product_box = QVBoxLayout(box_product)
+        layout_product_box.setContentsMargins(15, 15, 15, 15)
 
-        # ==========================================
-        # ЗОНА 2: Выбор товара
-        # ==========================================
-        lbl_title_2 = QLabel("📦 ВЫБОР ТОВАРА")
-        lbl_title_2.setStyleSheet("color: #a6adc8; font-weight: bold; font-size: 11px;")
-        layout.addWidget(lbl_title_2)
+        row_prod = QHBoxLayout()
+        row_prod.setSpacing(12)
 
-        row2 = QHBoxLayout()
         self.combo_product = QComboBox()
         self.combo_product.setEditable(True)
-        self.combo_product.setMinimumWidth(400)
-        self.combo_product.setPlaceholderText("Введите артикул или название товара...")
+        self.combo_product.setMinimumWidth(450)
+        self.combo_product.setPlaceholderText("Введите артикул или название товара для быстрого поиска...")
         self.combo_product.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         
         completer_prod = self.combo_product.completer()
@@ -91,34 +98,40 @@ class PageOrders(QWidget):
 
         self.spin_qty = QSpinBox()
         self.spin_qty.setMinimum(1)
+        self.spin_qty.setFixedWidth(80)
+        
         self.lbl_stock_info = QLabel("Доступно: 0")
-        self.lbl_stock_info.setStyleSheet("color: gray;")
+        self.lbl_stock_info.setStyleSheet("color: #a6adc8; font-style: italic;")
 
-        self.btn_add_to_cart = QPushButton("➕ Добавить в заказ")
+        self.btn_add_to_cart = QPushButton("🛒 Добавить в заказ")
+        self.btn_add_to_cart.setObjectName("action_btn")
+        self.btn_add_to_cart.setFixedWidth(180)
         self.btn_add_to_cart.clicked.connect(self.add_to_cart)
         
-        row2.addWidget(QLabel("Товар:"))
-        row2.addWidget(self.combo_product)
-        row2.addWidget(QLabel("  Кол-во:"))
-        row2.addWidget(self.spin_qty)
-        row2.addWidget(self.lbl_stock_info)
-        row2.addStretch()
-        row2.addWidget(self.btn_add_to_cart)
-        layout.addLayout(row2)
+        row_prod.addWidget(QLabel("Выбор товара:"))
+        row_prod.addWidget(self.combo_product)
+        row_prod.addWidget(QLabel("Кол-во:"))
+        row_prod.addWidget(self.spin_qty)
+        row_prod.addWidget(self.lbl_stock_info)
+        row_prod.addStretch()
+        row_prod.addWidget(self.btn_add_to_cart)
+        layout_product_box.addLayout(row_prod)
+        layout.addWidget(box_product)
 
-        # ==========================================
-        # ЗОНА 3: Корзина (Таблица)
-        # ==========================================
+        # =====================================================================
+        # ЗОНА 3: ТАБЛИЦА С КОРЗИНОЙ ЗАКАЗА
+        # =====================================================================
         self.table_cart = QTableWidget(0, 6)
-        self.table_cart.setHorizontalHeaderLabels(["ID", "Артикул", "Название", "Цена", "Кол-во (редакт. ✏️)", "Сумма"])
+        self.table_cart.setHorizontalHeaderLabels(["ID", "Артикул", "Название товара", "Цена за шт.", "Количество (✏️)", "Итоговая сумма"])
         
-        # Настройка фиксированной ширины столбцов (делаем Название аккуратным)
-        self.table_cart.setColumnWidth(0, 50)   # ID
-        self.table_cart.setColumnWidth(1, 100)  # Артикул
-        self.table_cart.setColumnWidth(2, 350)  # Название (задали комфортную длину)
-        self.table_cart.setColumnWidth(3, 100)  # Цена
-        self.table_cart.setColumnWidth(4, 150)  # Кол-во
-        self.table_cart.horizontalHeader().setStretchLastSection(True) # Столбец "Сумма" растянется на остаток
+        # Настройка интерактивных колонок с правильными стартовыми пропорциями
+        self.table_cart.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table_cart.setColumnWidth(0, 60)   # ID
+        self.table_cart.setColumnWidth(1, 110)  # Артикул
+        self.table_cart.setColumnWidth(3, 110)  # Цена
+        self.table_cart.setColumnWidth(4, 140)  # Кол-во
+        # Название товара занимает все свободное пространство
+        self.table_cart.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         
         self.table_cart.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_cart.cellChanged.connect(self.on_cell_changed)
@@ -128,19 +141,32 @@ class PageOrders(QWidget):
         
         layout.addWidget(self.table_cart)
 
-        # ==========================================
-        # ЗОНА 4: Подвал
-        # ==========================================
+        # =====================================================================
+        # ЗОНА 4: ПОДВАЛ И ОФОРМЛЕНИЕ ЧЕКА
+        # =====================================================================
         footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(5, 5, 5, 5)
         
         self.btn_clear = QPushButton("🗑 Очистить форму")
+        self.btn_clear.setStyleSheet("padding: 8px 15px; color: #f38ba8;")
         self.btn_clear.clicked.connect(self.clear_form)
         
-        self.lbl_total = QLabel("Итого: 0.00 руб.")
-        self.lbl_total.setStyleSheet("font-size: 18px; font-weight: bold; color: #a6e3a1;")
+        self.lbl_total = QLabel("Итого к оплате: 0.00 руб.")
+        self.lbl_total.setFont(QFont("Arial", 15, QFont.Weight.Bold))
+        self.lbl_total.setStyleSheet("color: #a6e3a1; margin-right: 15px;")
         
-        self.btn_checkout = QPushButton("🚀 Оформить заказ")
-        self.btn_checkout.setStyleSheet("background-color: #a6e3a1; color: #11111b; font-weight: bold; padding: 10px 20px; font-size: 14px; border-radius: 4px;")
+        self.btn_checkout = QPushButton("🚀 Сформировать и отправить заказ")
+        self.btn_checkout.setStyleSheet("""
+            QPushButton { 
+                background-color: #22c55e; 
+                color: #11111b; 
+                font-weight: bold; 
+                padding: 10px 25px; 
+                font-size: 13px; 
+                border-radius: 6px; 
+            }
+            QPushButton:hover { background-color: #4ade80; }
+        """)
         self.btn_checkout.clicked.connect(self.checkout)
         
         footer_layout.addWidget(self.btn_clear)
@@ -151,9 +177,9 @@ class PageOrders(QWidget):
 
         self.load_dropdowns()
 
-    # ==========================================
-    # ЛОГИКА ИНТЕРФЕЙСА
-    # ==========================================
+    # =====================================================================
+    # БИЗНЕС-ЛОГИКА СТРАНИЦЫ (ПОЛНОСТЬЮ СОХРАНЕНА)
+    # =====================================================================
     def load_dropdowns(self):
         self.combo_name.clear()
         self.combo_phone.clear()
@@ -284,7 +310,7 @@ class PageOrders(QWidget):
             self.table_cart.setItem(row, 4, item_qty)
             self.table_cart.setItem(row, 5, item_sum)
 
-        self.lbl_total.setText(f"Итого: {total_sum:.2f} руб.")
+        self.lbl_total.setText(f"Итого к оплате: {total_sum:.2f} руб.")
         self.table_cart.blockSignals(False)
 
     def show_cart_menu(self, pos):
