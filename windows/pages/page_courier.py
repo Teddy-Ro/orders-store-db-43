@@ -29,7 +29,7 @@ class PageCourier(QWidget):
         
         # Тулбар: заголовок + кнопка обновления в одну линию
         toolbar_free = QHBoxLayout()
-        toolbar_free.addWidget(QLabel("<h3>📥 Доступные оплаченные заказы в системе</h3>"))
+        toolbar_free.addWidget(QLabel("<h3>Доступные оплаченные заказы</h3>"))
         toolbar_free.addStretch()
         
         self.btn_refresh = QPushButton("🔄 Обновить")
@@ -54,7 +54,7 @@ class PageCourier(QWidget):
         self.table_available.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout_free.addWidget(self.table_available)
 
-        self.btn_accept = QPushButton("🚚 Взять выбранный заказ в работу")
+        self.btn_accept = QPushButton("Взять выбранный заказ в работу")
         self.btn_accept.setStyleSheet("background-color: #0284c7; color: white; padding: 12px; font-weight: bold; font-size: 14px; border-radius: 4px;")
         self.btn_accept.clicked.connect(self.take_order)
         layout_free.addWidget(self.btn_accept)
@@ -69,7 +69,7 @@ class PageCourier(QWidget):
         layout_active.setContentsMargins(0, 0, 0, 0)
         layout_active.setSpacing(15)
 
-        layout_active.addWidget(QLabel("<h3>📦 Текущее задание на доставку</h3>"))
+        layout_active.addWidget(QLabel("<h3>Текущее задание на доставку</h3>"))
 
         # Информационная карточка клиента (Поля выстроены строго в колонку)
         self.card_frame = QFrame()
@@ -129,7 +129,7 @@ class PageCourier(QWidget):
         layout_active.addWidget(self.table_items)
 
         # Кнопка выполнения заказа в подвале
-        self.btn_complete = QPushButton("🏁 Заказ успешно доставлен и вручен")
+        self.btn_complete = QPushButton("Заказ успешно доставлен и вручен")
         self.btn_complete.setStyleSheet("background-color: #22c55e; color: white; padding: 12px; font-weight: bold; font-size: 14px; border-radius: 4px;")
         self.btn_complete.clicked.connect(self.finish_order)
         layout_active.addWidget(self.btn_complete)

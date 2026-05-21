@@ -36,13 +36,12 @@ class MainWindow(QMainWindow):
 
         # ==================== ЛЕВАЯ ПАНЕЛЬ (САЙДБАР) ====================
         sidebar = QFrame()
-        sidebar.setObjectName("sidebar")  # Связываем объект с селектором в styles/themes.py
+        sidebar.setObjectName("sidebar")
         sidebar.setFixedWidth(220)
         
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(10, 20, 10, 20)
 
-        # Отображение профиля с автоматическим переносом длинных ФИО
         lbl_profile = QLabel(f"{self.user_name}\n\n{self.user_position}")
         lbl_profile.setStyleSheet("font-weight: bold; border: none;")
         lbl_profile.setWordWrap(True)
@@ -52,11 +51,9 @@ class MainWindow(QMainWindow):
         self.content_stack = QStackedWidget()
         self.content_stack.setStyleSheet("border: none;")
 
-        # Эксклюзивная группа для автоматического управления фокусом кнопок меню
         self.menu_group = QButtonGroup(self)
         self.menu_group.setExclusive(True)
 
-        # Приветственный экран (Индекс 0)
         page_welcome = QWidget()
         lbl_w = QLabel("Выберите раздел в меню слева", page_welcome)
         lbl_w.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -77,22 +74,20 @@ class MainWindow(QMainWindow):
                 sidebar_layout.addWidget(btn)
 
         # Наполнение модулей ERP системы
-        add_menu_item("🛒 Сборка заказа", PageOrders(user_info), [1, 2])
-        add_menu_item("📋 История заказов", PageOrdersHistory(user_info), [1, 2])
-        add_menu_item("👥 База клиентов", PageCustomers(), [1, 2])
-        add_menu_item("📦 Каталог товаров", PageProducts(), [1, 2])
-        add_menu_item("🚚 Доставки курьера", PageCourier(user_info), [1, 3])
-        add_menu_item("🏭 Поставщики", PageSuppliers(), [1]) 
-        add_menu_item("👥 Сотрудники", PageEmployees(), [1])
-        add_menu_item("📊 Аналитика и отчеты", PageAnalytics(), [1])
-        add_menu_item("🛠 Панель разработчика", PageDeveloper(), [1])
+        add_menu_item("Сборка заказа", PageOrders(user_info), [1, 2])
+        add_menu_item("История заказов", PageOrdersHistory(user_info), [1, 2])
+        add_menu_item("База клиентов", PageCustomers(), [1, 2])
+        add_menu_item("Каталог товаров", PageProducts(), [1, 2])
+        add_menu_item("Доставки курьера", PageCourier(user_info), [1, 3])
+        add_menu_item("Поставщики", PageSuppliers(), [1]) 
+        add_menu_item("Сотрудники", PageEmployees(), [1])
+        add_menu_item("Аналитика и отчеты", PageAnalytics(), [1])
+        add_menu_item("Панель разработчика", PageDeveloper(), [1])
 
-        # Прижимаем элементы управления темой и выходом к самому низу панели
         sidebar_layout.addStretch()
 
         # === КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ (ТЁМНАЯ / СВЕТЛАЯ) ===
         self.btn_theme = QPushButton("🌓 Сменить тему")
-        # Не добавляем в QButtonGroup, чтобы клик не сбрасывал активную вкладку меню
         self.btn_theme.clicked.connect(self.toggle_theme)
         sidebar_layout.addWidget(self.btn_theme)
 
@@ -104,7 +99,6 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(sidebar)
         main_layout.addWidget(self.content_stack)
 
-        # Применяем стартовую (проинициализированную) тему оформления
         self.apply_theme()
 
     def apply_theme(self):

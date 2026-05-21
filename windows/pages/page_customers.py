@@ -12,7 +12,7 @@ class PageCustomers(QWidget):
 
         # Панель инструментов
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("<h3>👥 База клиентов</h3>"))
+        toolbar.addWidget(QLabel("<h3>База клиентов</h3>"))
 
         toolbar.addWidget(QLabel("🔍 Поиск:"))
         self.in_search = QLineEdit()
@@ -27,7 +27,7 @@ class PageCustomers(QWidget):
         toolbar.addWidget(self.btn_add)
 
         self.btn_refresh = QPushButton("🔄 Обновить")
-        self.btn_refresh.clicked.connect(self.load_data) # Или load_orders, как называется твоя функция
+        self.btn_refresh.clicked.connect(self.load_data)
         toolbar.addWidget(self.btn_refresh)
         layout.addLayout(toolbar)
 
@@ -40,8 +40,8 @@ class PageCustomers(QWidget):
         self.table.setColumnWidth(3, 130)  # Телефон
         self.table.setColumnWidth(4, 130)  # Email
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows) # Выделять строку целиком
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers) # Запрет на двойной клик
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         
         # Настройка контекстного меню (ПКМ)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -65,7 +65,7 @@ class PageCustomers(QWidget):
 
     def filter_table(self, text):
         search_text = text.lower()
-        for row in range(self.table.rowCount()): # Убедись, что твоя таблица называется self.table
+        for row in range(self.table.rowCount()):
             row_visible = False
             for col in range(self.table.columnCount()):
                 item = self.table.item(row, col)

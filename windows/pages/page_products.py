@@ -17,7 +17,7 @@ class PageProducts(QWidget):
         top_layout.setContentsMargins(0, 0, 0, 0)
 
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("<h3>📦 Каталог товаров</h3>"))
+        toolbar.addWidget(QLabel("<h3>Каталог товаров</h3>"))
         
         toolbar.addWidget(QLabel("🔍 Поиск:"))
         self.in_search = QLineEdit()
@@ -38,7 +38,6 @@ class PageProducts(QWidget):
         
         top_layout.addLayout(toolbar)
 
-        # 9 колонок в соответствии со схемой
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels([
             "ID", "Артикул", "Название", "Закупка", "Продажа", 
@@ -72,7 +71,7 @@ class PageProducts(QWidget):
         bottom_layout = QVBoxLayout(bottom_container)
         bottom_layout.setContentsMargins(0, 5, 0, 0)
         
-        lbl_desc_title = QLabel("📝 ХАРАКТЕРИСТИКИ И ОПИСАНИЕ ТОВАРА")
+        lbl_desc_title = QLabel("ХАРАКТЕРИСТИКИ И ОПИСАНИЕ ТОВАРА")
         lbl_desc_title.setStyleSheet("color: #a6adc8; font-weight: bold; font-size: 11px;")
         bottom_layout.addWidget(lbl_desc_title)
         
@@ -109,7 +108,7 @@ class PageProducts(QWidget):
         unit = self.table.item(row, 6).text() or "шт."
         desc = self.table.item(row, 7).text() or "Описание отсутствует."
         
-        info_text = f"📦 Товар: {name}\n📐 Единица измерения: {unit}\n\n📖 Описание:\n{desc}"
+        info_text = f"Товар: {name}\nЕдиница измерения: {unit}\n\n Описание:\n{desc}"
         self.text_details.setText(info_text)
 
     def filter_table(self, text):

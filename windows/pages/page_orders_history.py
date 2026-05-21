@@ -20,7 +20,7 @@ class PageOrdersHistory(QWidget):
         
         # === НОВАЯ ПАНЕЛЬ ИНСТРУМЕНТОВ (ПОИСК И ОБНОВЛЕНИЕ) ===
         toolbar = QHBoxLayout()
-        lbl_orders = QLabel("📋 ИСТОРИЯ ЗАКАЗОВ")
+        lbl_orders = QLabel("ИСТОРИЯ ЗАКАЗОВ")
         lbl_orders.setStyleSheet("color: #a6adc8; font-weight: bold; font-size: 11px;")
         toolbar.addWidget(lbl_orders)
         
@@ -138,7 +138,7 @@ class PageOrdersHistory(QWidget):
             QMessageBox.critical(self, "Ошибка БД", f"Сбой загрузки заказов:\n{e}")
         finally:
             self.table_orders.blockSignals(False)
-            self.table_details.setRowCount(0) # Очищаем нижнюю таблицу при обновлении
+            self.table_details.setRowCount(0)
 
     def load_details(self):
         selected_items = self.table_orders.selectedItems()
@@ -207,6 +207,6 @@ class PageOrdersHistory(QWidget):
             try:
                 update_order_status(order_id, new_status)
                 self.load_orders()
-                self.in_search.clear() # Очищаем поиск при смене статуса
+                self.in_search.clear()
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка БД", f"Не удалось изменить статус:\n{e}")

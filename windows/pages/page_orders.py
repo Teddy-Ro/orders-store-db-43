@@ -12,7 +12,6 @@ class PageOrders(QWidget):
         self.seller_id = user_info[0] 
         self.cart_items = {} 
 
-        # Главный вертикальный слой страницы с хорошими отступами
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
@@ -20,7 +19,7 @@ class PageOrders(QWidget):
         # =====================================================================
         # ЗОНА 1: КАРТОЧКА КЛИЕНТА И ДОСТАВКИ
         # =====================================================================
-        box_client = QGroupBox("👤 Данные клиента и доставки")
+        box_client = QGroupBox("Данные клиента и доставки")
         box_client.setStyleSheet("QGroupBox { font-weight: bold; }")
         layout_client_box = QVBoxLayout(box_client)
         layout_client_box.setContentsMargins(15, 15, 15, 15)
@@ -74,7 +73,7 @@ class PageOrders(QWidget):
         # =====================================================================
         # ЗОНА 2: КАРТОЧКА ВЫБОРА ТОВАРОВ
         # =====================================================================
-        box_product = QGroupBox("📦 Подбор товаров в корзину")
+        box_product = QGroupBox("Подбор товаров в корзину")
         box_product.setStyleSheet("QGroupBox { font-weight: bold; }")
         layout_product_box = QVBoxLayout(box_product)
         layout_product_box.setContentsMargins(15, 15, 15, 15)
@@ -124,13 +123,11 @@ class PageOrders(QWidget):
         self.table_cart = QTableWidget(0, 6)
         self.table_cart.setHorizontalHeaderLabels(["ID", "Артикул", "Название товара", "Цена за шт.", "Количество (✏️)", "Итоговая сумма"])
         
-        # Настройка интерактивных колонок с правильными стартовыми пропорциями
         self.table_cart.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table_cart.setColumnWidth(0, 60)   # ID
         self.table_cart.setColumnWidth(1, 110)  # Артикул
         self.table_cart.setColumnWidth(3, 110)  # Цена
         self.table_cart.setColumnWidth(4, 140)  # Кол-во
-        # Название товара занимает все свободное пространство
         self.table_cart.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         
         self.table_cart.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)

@@ -11,7 +11,7 @@ class PageSuppliers(QWidget):
         layout = QVBoxLayout(self)
 
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("<h3>🏭 База поставщиков</h3>"))
+        toolbar.addWidget(QLabel("<h3>База поставщиков</h3>"))
 
         toolbar.addWidget(QLabel("🔍 Поиск:"))
         self.in_search = QLineEdit()

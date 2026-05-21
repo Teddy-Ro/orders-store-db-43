@@ -8,7 +8,7 @@ class PageEmployees(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("<h3>🧑‍💼 Штат сотрудников</h3>"))
+        toolbar.addWidget(QLabel("<h3>Штат сотрудников</h3>"))
 
         toolbar.addWidget(QLabel("🔍 Поиск:"))
         self.in_search = QLineEdit()

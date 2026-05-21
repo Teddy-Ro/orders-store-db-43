@@ -55,12 +55,12 @@ class PageAnalytics(QWidget):
         # ВКЛАДКА 1: Числовые показатели
         self.tab_numbers = QWidget()
         self.setup_numbers_tab()
-        self.tabs.addTab(self.tab_numbers, "📈 Сводные KPI и ТОПы")
+        self.tabs.addTab(self.tab_numbers, "Сводные KPI и ТОПы")
 
         # ВКЛАДКА 2: Аналитический Дашборд
         self.tab_charts = QWidget()
         self.setup_charts_tab()
-        self.tabs.addTab(self.tab_charts, "📊 Аналитический Дашборд")
+        self.tabs.addTab(self.tab_charts, "Аналитический Дашборд")
 
         self.refresh_analytics()
 
@@ -85,20 +85,20 @@ class PageAnalytics(QWidget):
         self.lbl_rate.setStyleSheet("border: none; color: #f9e2af;")
         self.lbl_total_orders.setStyleSheet("border: none; color: #89b4fa;")
 
-        kpi_grid.addWidget(QLabel("💰 ВЫРУЧКА ЗА ПЕРИОД:"), 0, 0)
+        kpi_grid.addWidget(QLabel("ВЫРУЧКА ЗА ПЕРИОД:"), 0, 0)
         kpi_grid.addWidget(self.lbl_revenue, 1, 0)
-        kpi_grid.addWidget(QLabel("📈 ЧИСТАЯ ПРИБЫЛЬ:"), 0, 1)
+        kpi_grid.addWidget(QLabel("ЧИСТАЯ ПРИБЫЛЬ:"), 0, 1)
         kpi_grid.addWidget(self.lbl_profit, 1, 1)
-        kpi_grid.addWidget(QLabel("🏁 УСПЕШНОСТЬ ДОСТАВОК:"), 0, 2)
+        kpi_grid.addWidget(QLabel("УСПЕШНОСТЬ ДОСТАВОК:"), 0, 2)
         kpi_grid.addWidget(self.lbl_rate, 1, 2)
         
-        kpi_grid.addWidget(QLabel("🛒 СРЕДНИЙ ЧЕК ЗАКАЗА:"), 2, 0)
+        kpi_grid.addWidget(QLabel("СРЕДНИЙ ЧЕК ЗАКАЗА:"), 2, 0)
         kpi_grid.addWidget(self.lbl_avg_check, 3, 0)
-        kpi_grid.addWidget(QLabel("📋 ВСЕГО ОФОРМЛЕНО ЗАКАЗОВ:"), 2, 1)
+        kpi_grid.addWidget(QLabel("ВСЕГО ОФОРМЛЕНО ЗАКАЗОВ:"), 2, 1)
         kpi_grid.addWidget(self.lbl_total_orders, 3, 1)
         
         vbox.addWidget(kpi_widget)
-        vbox.addWidget(QLabel("<h3>🔥 Топ-5 самых прибыльных товаров</h3>"))
+        vbox.addWidget(QLabel("<h3>Топ-5 самых прибыльных товаров</h3>"))
 
         self.table_top = QTableWidget(0, 4)
         self.table_top.setHorizontalHeaderLabels(["Артикул", "Название товара", "Продано (шт)", "Общая сумма продаж"])
@@ -218,14 +218,10 @@ class PageAnalytics(QWidget):
             for bar in bars:
                 width = bar.get_width()
                 
-                # Умное позиционирование: если столбик слишком узкий (например, 0 продаж), 
-                # пишем текст снаружи. Если широкий — пишем внутри столбика.
                 if width > max_sum * 0.2:
-                    # Внутри столбика: смещение влево, цвет текста темный (#11111b) для идеальной контрастности
                     ax_sellers.text(width - (max_sum * 0.02), bar.get_y() + bar.get_height()/2, f'{width:,.0f} р.', 
                                     va='center', ha='right', color='#11111b', fontsize=8, fontweight='bold')
                 else:
-                    # Снаружи столбика: смещение вправо, цвет светлый
                     ax_sellers.text(width + (max_sum * 0.02), bar.get_y() + bar.get_height()/2, f'{width:,.0f} р.', 
                                     va='center', ha='left', color='#cdd6f4', fontsize=8, fontweight='bold')
                                 

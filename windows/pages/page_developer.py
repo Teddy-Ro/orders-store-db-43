@@ -7,13 +7,13 @@ class PageDeveloper(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
         
-        layout.addWidget(QLabel("<h2>🛠 Панель администратора / разработчика</h2>"))
+        layout.addWidget(QLabel("<h2>Панель разработчика</h2>"))
         
         # --- БЛОК 1: ПАРАМЕТРЫ СИДЕРА (ЗАПОЛНЕНИЕ) ---
         box_seed = QFrame()
         box_seed.setStyleSheet("QFrame { background-color: rgba(255,255,255,0.01); border: 1px solid #313244; border-radius: 6px; }")
         vbox_seed = QVBoxLayout(box_seed)
-        vbox_seed.addWidget(QLabel("<h3>⚡ Генерация тестовых данных (Seeder)</h3>"))
+        vbox_seed.addWidget(QLabel("<h3>Генерация тестовых данных (Seeder)</h3>"))
         
         form_layout = QFormLayout()
         self.spin_cust = QSpinBox()
@@ -34,7 +34,7 @@ class PageDeveloper(QWidget):
         form_layout.addRow("Глубина истории продаж (дней):", self.spin_days)
         vbox_seed.addLayout(form_layout)
         
-        self.btn_seed = QPushButton("🎲 Заполнить базу данных случайными трендами")
+        self.btn_seed = QPushButton("Заполнить базу данных случайными трендами")
         self.btn_seed.setStyleSheet("""
             QPushButton { background-color: #a6e3a1; color: black; padding: 10px; font-weight: bold; border-radius: 4px; }
             QPushButton:hover { background-color: #94e2d5; }
@@ -54,7 +54,7 @@ class PageDeveloper(QWidget):
         vbox_clear.addWidget(QLabel("Данная функция полностью сотрет все заказы, товары, поставщиков и клиентов.\n"
                                     "В базе останется только один дефолтный аккаунт управляющего: <b>admin / admin</b>."))
         
-        self.btn_clear = QPushButton("🗑 Полностью очистить базу данных")
+        self.btn_clear = QPushButton("Полностью очистить базу данных")
         self.btn_clear.setStyleSheet("""
             QPushButton { background-color: #C96F00; color: black; padding: 12px; font-weight: bold; font-size: 13px; border-radius: 4px; }
             QPushButton:hover { background-color: #E33400; }

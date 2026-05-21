@@ -3,9 +3,12 @@ import random
 import string
 from .connection import get_connection
 
+# =====================================================================
+# ИНИЦИАЛИЗАЦИЯ И СЛУЖЕБНЫЕ ФУНКЦИИ
+# =====================================================================
+
 def init_database():
     """Читает SQL-файл и создает таблицы в базе данных."""
-    # Получаем абсолютный путь к файлу SQL, чтобы скрипт работал из любой папки
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sql_file_path = os.path.join(base_dir, 'sql', 'create_tables.sql')
 
@@ -24,6 +27,24 @@ def init_database():
         cur.close()
         conn.close()
 
+def generate_unique_article():
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        while True:
+            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+            article = f"PRD-{suffix}"
+            cur.execute("SELECT 1 FROM products WHERE article = %s;", (article,))
+            if not cur.fetchone():
+                return article
+    finally:
+        cur.close()
+        conn.close()
+
+# =====================================================================
+# КЛИЕНТЫ (CUSTOMERS)
+# =====================================================================
+
 def get_all_customers():
     conn = get_connection(); cur = conn.cursor()
     try:
@@ -33,26 +54,23 @@ def get_all_customers():
         cur.close(); 
         conn.close()
 
-def check_login(login, password):
-    """Проверяет логин и пароль сотрудника. Возвращает данные или None."""
-    conn = get_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT EmployeeID, FullName, AccessLevel, Position 
-            FROM Employees 
-            WHERE Login = %s AND Password = %s;
-        """, (login, password))
-        return cur.fetchone() # Вернет кортеж с данными или None
-    finally:
-        cur.close()
-        conn.close()
-
 def add_customer(full_name, company, phone, email):
     conn = get_connection(); cur = conn.cursor()
     try:
         cur.execute("INSERT INTO Customers (FullName, CompanyName, PhoneNumber, Email) VALUES (%s, %s, %s, %s)", 
                     (full_name, company, phone, email))
+        conn.commit()
+    except Exception as e: 
+        conn.rollback(); raise e
+    finally: 
+        cur.close(); 
+        conn.close()
+
+def update_customer(customer_id, full_name, company, phone, email):
+    conn = get_connection(); cur = conn.cursor()
+    try:
+        cur.execute("UPDATE Customers SET FullName=%s, CompanyName=%s, PhoneNumber=%s, Email=%s WHERE CustomerID=%s", 
+                    (full_name, company, phone, email, customer_id))
         conn.commit()
     except Exception as e: 
         conn.rollback(); raise e
@@ -74,17 +92,17 @@ def delete_customer(customer_id):
         cur.close()
         conn.close()
 
-def update_customer(customer_id, full_name, company, phone, email):
+def get_customers_for_search():
+    """Получает клиентов для умного поиска (ID, Имя, Телефон, Email)"""
     conn = get_connection(); cur = conn.cursor()
     try:
-        cur.execute("UPDATE Customers SET FullName=%s, CompanyName=%s, PhoneNumber=%s, Email=%s WHERE CustomerID=%s", 
-                    (full_name, company, phone, email, customer_id))
-        conn.commit()
-    except Exception as e: 
-        conn.rollback(); raise e
-    finally: 
-        cur.close(); 
-        conn.close()
+        cur.execute("SELECT CustomerID, FullName, PhoneNumber, Email FROM Customers;")
+        return cur.fetchall()
+    finally: cur.close(); conn.close()
+
+# =====================================================================
+# ПОСТАВЩИКИ (SUPPLIERS)
+# =====================================================================
 
 def get_all_suppliers():
     conn = get_connection()
@@ -142,7 +160,35 @@ def delete_supplier(supplier_id):
         cur.close()
         conn.close()
 
-# ================= СОТРУДНИКИ =================
+def get_suppliers_for_dropdown():
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT supplierid, companyname FROM suppliers ORDER BY companyname;")
+        return cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+# =====================================================================
+# СОТРУДНИКИ (EMPLOYEES)
+# =====================================================================
+
+def check_login(login, password):
+    """Проверяет логин и пароль сотрудника. Возвращает данные или None."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT EmployeeID, FullName, AccessLevel, Position 
+            FROM Employees 
+            WHERE Login = %s AND Password = %s;
+        """, (login, password))
+        return cur.fetchone()
+    finally:
+        cur.close()
+        conn.close()
+
 def get_all_employees():
     conn = get_connection(); cur = conn.cursor()
     try:
@@ -174,12 +220,14 @@ def delete_employee(emp_id):
     except Exception as e: conn.rollback(); raise e
     finally: cur.close(); conn.close()
 
-# ================= ТОВАРЫ =================
+# =====================================================================
+# ТОВАРЫ (PRODUCTS)
+# =====================================================================
+
 def get_all_products():
     conn = get_connection()
     cur = conn.cursor()
     try:
-        # Запрос строго по твоей схеме: убрали category
         cur.execute("""
             SELECT productid, article, productname, purchaseprice, saleprice, stockbalance, 
                    unit, description, supplierid 
@@ -238,27 +286,21 @@ def delete_product(prod_id):
     except Exception as e: conn.rollback(); raise e
     finally: cur.close(); conn.close()
 
-def get_customers_for_search():
-    """Получает клиентов для умного поиска (ID, Имя, Телефон, Email)"""
-    conn = get_connection(); cur = conn.cursor()
-    try:
-        cur.execute("SELECT CustomerID, FullName, PhoneNumber, Email FROM Customers;")
-        return cur.fetchall()
-    finally: cur.close(); conn.close()
-
 def get_products_for_search():
     """Получает товары для умного поиска и контроля остатков"""
     conn = get_connection(); cur = conn.cursor()
     try:
-        # Вытаскиваем ID, Артикул, Название, Цену продажи, Остаток и Единицу измерения
         cur.execute("SELECT ProductID, Article, ProductName, SalePrice, StockBalance, Unit FROM Products WHERE StockBalance > 0;")
         return cur.fetchall()
     finally: cur.close(); conn.close()
 
+# =====================================================================
+# ЗАКАЗЫ (ORDERS)
+# =====================================================================
+
 def create_order_transaction(customer_id, seller_id, address, cart_items):
     conn = get_connection(); cur = conn.cursor()
     try:
-        # ЗАМЕНИЛИ CURRENT_DATE на CURRENT_TIMESTAMP
         cur.execute("""
             INSERT INTO Orders (CustomerID, EmployeeID, OrderDate, Status, ShippingAddress) 
             VALUES (%s, %s, CURRENT_TIMESTAMP, 'Новый', %s) RETURNING OrderID;
@@ -282,11 +324,9 @@ def create_order_transaction(customer_id, seller_id, address, cart_items):
     finally:
         cur.close(); conn.close()
 
-# ================= ЖУРНАЛ ЗАКАЗОВ =================
 def get_all_orders():
     conn = get_connection(); cur = conn.cursor()
     try:
-        # ТУТ ИСПРАВИЛИ oi.Price на oi.PriceAtOrder
         cur.execute("""
             SELECT o.OrderID, o.OrderDate, o.Status,
                    c.FullName AS Customer,
@@ -320,12 +360,10 @@ def update_order_status(order_id, new_status):
     """Обновляет статус заказа. Если заказ отменен - возвращает товары на склад."""
     conn = get_connection(); cur = conn.cursor()
     try:
-        # Проверяем текущий статус, чтобы не вернуть товары дважды
         cur.execute("SELECT Status FROM Orders WHERE OrderID = %s", (order_id,))
         current_status = cur.fetchone()[0]
 
         if new_status == 'Отменен' and current_status != 'Отменен':
-            # Фишка для курсовой: Транзакция возврата остатков
             cur.execute("SELECT ProductID, Quantity FROM OrderItems WHERE OrderID = %s", (order_id,))
             for p_id, qty in cur.fetchall():
                 cur.execute("UPDATE Products SET StockBalance = StockBalance + %s WHERE ProductID = %s", (qty, p_id))
@@ -336,33 +374,10 @@ def update_order_status(order_id, new_status):
         conn.rollback(); raise e
     finally: cur.close(); conn.close()
 
-def get_suppliers_for_dropdown():
-    conn = get_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT supplierid, companyname FROM suppliers ORDER BY companyname;")
-        return cur.fetchall()
-    finally:
-        cur.close()
-        conn.close()
-
-def generate_unique_article():
-    conn = get_connection()
-    cur = conn.cursor()
-    try:
-        while True:
-            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-            article = f"PRD-{suffix}"
-            cur.execute("SELECT 1 FROM products WHERE article = %s;", (article,))
-            if not cur.fetchone():
-                return article
-    finally:
-        cur.close()
-        conn.close()
-
 # =====================================================================
-# БЛОК КУРЬЕРА (СТРОГО ПО ER-ДИАГРАММЕ)
+# БЛОК КУРЬЕРА (COURIERS)
 # =====================================================================
+
 def get_available_orders():
     """Возвращает все оплаченные заказы, у которых еще нет курьера"""
     conn = get_connection()
@@ -402,7 +417,6 @@ def get_order_items_details(order_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        # Заменили orderdetails на orderitems и price на priceatorder
         cur.execute("""
             SELECT p.article, p.productid, p.productname, oi.quantity
             FROM orderitems oi
@@ -451,11 +465,14 @@ def complete_order(order_id):
         cur.close()
         conn.close()
 
+# =====================================================================
+# АНАЛИТИКА И ОТЧЕТЫ (ANALYTICS)
+# =====================================================================
+
 def get_analytics_kpis(start_date, end_date):
     """Считает расширенный список KPI: Выручку, Прибыль, Процент выполнения, Средний чек и Число заказов."""
     conn = get_connection(); cur = conn.cursor()
     try:
-        # 1. Выручка (только по успешным/активным заказам)
         cur.execute("""
             SELECT COALESCE(SUM(totalamount), 0) FROM orders 
             WHERE status IN ('Оплачен', 'В доставке', 'Доставлен') 
@@ -463,7 +480,6 @@ def get_analytics_kpis(start_date, end_date):
         """, (start_date, end_date))
         revenue = float(cur.fetchone()[0])
 
-        # 2. Чистая прибыль (Выручка - Закупка)
         cur.execute("""
             SELECT COALESCE(SUM((oi.priceatorder - p.purchaseprice) * oi.quantity), 0)
             FROM orderitems oi
@@ -474,7 +490,6 @@ def get_analytics_kpis(start_date, end_date):
         """, (start_date, end_date))
         profit = float(cur.fetchone()[0])
 
-        # 3. Процент успешных доставок
         cur.execute("""
             SELECT 
                 COUNT(CASE WHEN status = 'Доставлен' THEN 1 END)::float / 
@@ -484,7 +499,6 @@ def get_analytics_kpis(start_date, end_date):
         res = cur.fetchone()[0]
         rate = round(res, 1) if res is not None else 0.0
 
-        # 4. Средний чек (Новая метрика)
         cur.execute("""
             SELECT COALESCE(AVG(totalamount), 0) FROM orders 
             WHERE status IN ('Оплачен', 'В доставке', 'Доставлен') 
@@ -492,7 +506,6 @@ def get_analytics_kpis(start_date, end_date):
         """, (start_date, end_date))
         avg_check = float(cur.fetchone()[0])
 
-        # 5. Всего оформлено заказов (Новая метрика)
         cur.execute("""
             SELECT COUNT(*) FROM orders 
             WHERE orderdate::date BETWEEN %s AND %s;

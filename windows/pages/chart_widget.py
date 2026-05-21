@@ -5,19 +5,18 @@ from PyQt6.QtCore import Qt, QPointF
 class SimpleLineChart(QWidget):
     def __init__(self):
         super().__init__()
-        self.data_points = [] # Список кортежей (дата_строка, значение)
+        self.data_points = []
         self.setMinimumHeight(250)
 
     def set_data(self, data):
         self.data_points = data
-        self.update() # Перерисовка виджета
+        self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Очистка фона
-        painter.fillRect(self.rect(), QColor("#1e1e2e")) # Темный фон в стиле Catppuccin
+        painter.fillRect(self.rect(), QColor("#1e1e2e"))
 
         if not self.data_points:
             painter.setPen(QColor("#a6adc8"))
@@ -33,7 +32,7 @@ class SimpleLineChart(QWidget):
         height = self.height() - margin_top - margin_bottom
 
         max_val = max([p[1] for p in self.data_points]) or 1.0
-        max_val = max_val * 1.1 # Запас сверху 10%
+        max_val = max_val * 1.1
 
         # Рисуем сетку координат
         grid_pen = QPen(QColor("#313244"), 1, Qt.PenStyle.DashLine)
@@ -60,7 +59,7 @@ class SimpleLineChart(QWidget):
 
         # Рисуем график-градиент (заливка под линией)
         if len(points) > 1:
-            path_brush = QBrush(QColor(137, 180, 250, 40)) # Полупрозрачный синий
+            path_brush = QBrush(QColor(137, 180, 250, 40))
             painter.setBrush(path_brush)
             painter.setPen(Qt.PenStyle.NoPen)
             
