@@ -152,7 +152,7 @@ class PageOrders(QWidget):
         self.lbl_total.setFont(QFont("Arial", 15, QFont.Weight.Bold))
         self.lbl_total.setStyleSheet("color: #a6e3a1; margin-right: 15px;")
         
-        self.btn_checkout = QPushButton("🚀 Сформировать и отправить заказ")
+        self.btn_checkout = QPushButton("Сформировать и отправить заказ")
         self.btn_checkout.setStyleSheet("""
             QPushButton { 
                 background-color: #22c55e; 

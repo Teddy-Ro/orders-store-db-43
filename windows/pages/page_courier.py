@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QLabel, QTableWidget, QTableWidgetItem, QMessageBox, 
-                             QStackedWidget, QFrame, QGridLayout, QHeaderView)
+                             QStackedWidget, QFrame, QGridLayout, QHeaderView, QSplitter)
 from PyQt6.QtCore import Qt
 from database.queries import (get_available_orders, get_active_courier_order, 
                               get_order_items_details, accept_order, complete_order)
@@ -9,14 +9,13 @@ class PageCourier(QWidget):
     def __init__(self, user_info):
         super().__init__()
         self.user_info = user_info
-        self.courier_id = user_info[0]  # employeeid авторизованного курьера
+        self.courier_id = user_info[0] 
         self.current_order_id = None
 
         # Главный слой страницы
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(15, 15, 15, 15)
 
-        # Контейнер состояний экрана (Исключает любые наложения текста)
         self.stack = QStackedWidget()
         main_layout.addWidget(self.stack)
 
@@ -29,158 +28,226 @@ class PageCourier(QWidget):
         
         # Тулбар: заголовок + кнопка обновления в одну линию
         toolbar_free = QHBoxLayout()
-        toolbar_free.addWidget(QLabel("<h3>Доступные оплаченные заказы</h3>"))
+        lbl_pool = QLabel("ДОСТУПНЫЕ ЗАКАЗЫ ДЛЯ ДОСТАВКИ")
+        lbl_pool.setStyleSheet("color: #a6adc8; font-weight: bold; font-size: 11px;")
+        toolbar_free.addWidget(lbl_pool)
+        
         toolbar_free.addStretch()
         
-        self.btn_refresh = QPushButton("🔄 Обновить")
-        self.btn_refresh.setStyleSheet("padding: 6px 12px;")
-        self.btn_refresh.clicked.connect(self.load_available_orders)
-        toolbar_free.addWidget(self.btn_refresh)
-        
+        btn_refresh = QPushButton("🔄 Обновить")
+        btn_refresh.setFixedWidth(100)
+        btn_refresh.clicked.connect(self.refresh_screen)
+        toolbar_free.addWidget(btn_refresh)
         layout_free.addLayout(toolbar_free)
-        
-        self.table_available = QTableWidget(0, 4)
-        self.table_available.setHorizontalHeaderLabels([
-            "ID Заказа", "Дата оформления", "Клиент", "Адрес доставки"
-        ])
-        
-        self.table_available.setColumnWidth(0, 90)   # ID Заказа
-        self.table_available.setColumnWidth(1, 160)  # Дата оформления
-        self.table_available.setColumnWidth(2, 220)  # Клиент
-        # Адрес доставки займет ВСЁ оставшееся место на экране:
-        self.table_available.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        
+
+        splitter_free = QSplitter(Qt.Orientation.Vertical)
+
+        # --- Верхний виджет: Доступные заказы ---
+        widget_orders = QWidget()
+        layout_orders = QVBoxLayout(widget_orders)
+        layout_orders.setContentsMargins(0, 0, 0, 0)
+
+        self.table_available = QTableWidget()
+        self.table_available.setColumnCount(4)
+        self.table_available.setHorizontalHeaderLabels(["ID Заказа", "Дата создания", "Сумма", "Покупатель"])
+        self.table_available.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_available.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table_available.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        layout_free.addWidget(self.table_available)
+        self.table_available.itemSelectionChanged.connect(self.load_order_items)
+        layout_orders.addWidget(self.table_available)
 
-        self.btn_accept = QPushButton("Взять выбранный заказ в работу")
-        self.btn_accept.setStyleSheet("background-color: #0284c7; color: white; padding: 12px; font-weight: bold; font-size: 14px; border-radius: 4px;")
-        self.btn_accept.clicked.connect(self.take_order)
-        layout_free.addWidget(self.btn_accept)
+        btn_take = QPushButton("Взять выбранный заказ в работу")
+        btn_take.setStyleSheet("background-color: #a6e3a1; color: #11111b; font-weight: bold; height: 35px;")
+        btn_take.clicked.connect(self.take_order)
+        layout_orders.addWidget(btn_take)
         
+        splitter_free.addWidget(widget_orders)
+
+        # --- Нижний виджет: Предпросмотр состава заказа ---
+        widget_items = QWidget()
+        layout_items = QVBoxLayout(widget_items)
+        layout_items.setContentsMargins(0, 10, 0, 0)
+
+        lbl_items = QLabel("СОСТАВ ВЫБРАННОГО ЗАКАЗА (ПРЕДПРОСМОТР)")
+        lbl_items.setStyleSheet("color: #cfc9c2; font-weight: bold; font-size: 11px;")
+        layout_items.addWidget(lbl_items)
+
+        self.table_items = QTableWidget()
+        self.table_items.setColumnCount(4)
+        self.table_items.setHorizontalHeaderLabels(["Товар", "Цена за ед.", "Количество", "Стоимость"])
+        self.table_items.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_items.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout_items.addWidget(self.table_items)
+
+        splitter_free.addWidget(widget_items)
+        
+        # Добавляем сплиттер в главный слой страницы пула заказов
+        layout_free.addWidget(splitter_free)
         self.stack.addWidget(self.page_free)
 
         # =====================================================================
-        # СТРАНИЦА 1: КУРЬЕР В ПУТИ (Полная информация об одном активном заказе)
+        # СТРАНИЦА 1: КУРЬЕР ЗАНЯТ (Активный заказ в процессе доставки)
         # =====================================================================
-        self.page_active = QWidget()
-        layout_active = QVBoxLayout(self.page_active)
-        layout_active.setContentsMargins(0, 0, 0, 0)
-        layout_active.setSpacing(15)
+        self.page_busy = QWidget()
+        layout_busy = QVBoxLayout(self.page_busy)
+        
+        lbl_active = QLabel("ВАШ АКТИВНЫЙ ЗАКАЗ В РАБОТЕ")
+        lbl_active.setStyleSheet("color: #f9e2af; font-weight: bold; font-size: 11px; margin-bottom: 5px;")
+        layout_busy.addWidget(lbl_active)
 
-        layout_active.addWidget(QLabel("<h3>Текущее задание на доставку</h3>"))
-
-        # Информационная карточка клиента (Поля выстроены строго в колонку)
+        # Карточка с информацией о клиенте и доставке
         self.card_frame = QFrame()
-        self.card_frame.setStyleSheet("""
-            QFrame { 
-                background-color: rgba(255, 255, 255, 0.03); 
-                border: 1px solid #313244; 
-                border-radius: 6px; 
-            } 
-            QLabel { 
-                border: none; 
-                font-size: 13px; 
-            }
-        """)
-        card_layout = QGridLayout(self.card_frame)
-        card_layout.setContentsMargins(15, 15, 15, 15)
-        card_layout.setSpacing(12)  # Увеличили шаг между строками для читаемости
-
-        self.val_order_id = QLabel("-")
-        self.val_order_id.setStyleSheet("font-weight: bold; color: #38bdf8; font-size: 15px;")
-        self.val_date = QLabel("-")
-        self.val_client = QLabel("-")
-        self.val_phone = QLabel("-")
-        self.val_address = QLabel("-")
-        self.val_address.setStyleSheet("color: #a6e3a1; font-weight: bold; font-size: 14px;")
-
-        # Размещение элементов строго вертикально
-        card_layout.addWidget(QLabel("<b>Номер заказа:</b>"), 0, 0)
-        card_layout.addWidget(self.val_order_id, 0, 1)
+        self.card_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.card_frame.setStyleSheet("background-color: #1e1e2e; border-radius: 8px; border: 1px solid #313244;")
+        self.card_layout = QGridLayout(self.card_frame)
+        self.card_layout.setContentsMargins(15, 15, 15, 15)
         
-        card_layout.addWidget(QLabel("<b>Дата создания:</b>"), 1, 0)
-        card_layout.addWidget(self.val_date, 1, 1)
+        self.lbl_info_id = QLabel()
+        self.lbl_info_customer = QLabel()
+        self.lbl_info_phone = QLabel()
+        self.lbl_info_amount = QLabel()
         
-        card_layout.addWidget(QLabel("<b>Получатель (ФИО):</b>"), 2, 0)
-        card_layout.addWidget(self.val_client, 2, 1)
+        self.card_layout.addWidget(QLabel("Заказ:"), 0, 0)
+        self.card_layout.addWidget(self.lbl_info_id, 0, 1)
+        self.card_layout.addWidget(QLabel("Получатель:"), 1, 0)
+        self.card_layout.addWidget(self.lbl_info_customer, 1, 1)
+        self.card_layout.addWidget(QLabel("Телефон:"), 2, 0)
+        self.card_layout.addWidget(self.lbl_info_phone, 2, 1)
+        self.card_layout.addWidget(QLabel("Сумма к оплате:"), 3, 0)
+        self.card_layout.addWidget(self.lbl_info_amount, 3, 1)
         
-        card_layout.addWidget(QLabel("<b>Телефон связи:</b>"), 3, 0)
-        card_layout.addWidget(self.val_phone, 3, 1)
-        
-        card_layout.addWidget(QLabel("<b>Адрес доставки:</b>"), 4, 0)
-        card_layout.addWidget(self.val_address, 4, 1)
-        
-        card_layout.setColumnMinimumWidth(0, 150)
-        card_layout.setColumnStretch(1, 1)
+        layout_busy.addWidget(self.card_frame)
 
-        layout_active.addWidget(self.card_frame)
+        # Таблица состава текущего активного заказа
+        lbl_active_items = QLabel("Содержимое посылки:")
+        lbl_active_items.setStyleSheet("color: #a6adc8; font-weight: bold; margin-top: 10px;")
+        layout_busy.addWidget(lbl_active_items)
 
-        # Таблица состава товаров
-        layout_active.addWidget(QLabel("<b>Состав посылки (список товаров):</b>"))
-        self.table_items = QTableWidget(0, 4)
-        self.table_items.setHorizontalHeaderLabels(["Артикул", "ID Товара", "Название товара", "Количество (шт)"])
-        
-        # Настройка интерактивных колонок
-        self.table_items.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table_items.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table_items.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        layout_active.addWidget(self.table_items)
+        self.table_active_items = QTableWidget()
+        self.table_active_items.setColumnCount(4)
+        self.table_active_items.setHorizontalHeaderLabels(["Товар", "Цена", "Кол-во", "Итого"])
+        self.table_active_items.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout_busy.addWidget(self.table_active_items)
 
-        # Кнопка выполнения заказа в подвале
-        self.btn_complete = QPushButton("Заказ успешно доставлен и вручен")
-        self.btn_complete.setStyleSheet("background-color: #22c55e; color: white; padding: 12px; font-weight: bold; font-size: 14px; border-radius: 4px;")
-        self.btn_complete.clicked.connect(self.finish_order)
-        layout_active.addWidget(self.btn_complete)
+        # Кнопка завершения
+        btn_complete = QPushButton("Доставлено! Закрыть заказ")
+        btn_complete.setStyleSheet("background-color: #a6e3a1; color: #11111b; font-weight: bold; height: 40px; margin-top: 10px;")
+        btn_complete.clicked.connect(self.finish_order)
+        layout_busy.addWidget(btn_complete)
 
-        self.stack.addWidget(self.page_active)
+        self.stack.addWidget(self.page_busy)
 
-        # Определение стартового состояния экрана
+        # Первичный запуск отрисовки данных
         self.refresh_screen()
 
     def refresh_screen(self):
-        """Проверяет состояние курьера и переключает экраны"""
+        """Проверяет статус курьера в БД и переключает интерфейс."""
         active_order = get_active_courier_order(self.courier_id)
         
+        # Очищаем таблицу предпросмотра при обновлении экрана
+        self.table_items.setRowCount(0)
+
         if active_order:
-            # Есть активный заказ -> Карточка активного заказа
+            # Курьер занят -> Показываем Экран 1
             self.current_order_id = active_order[0]
+            self.lbl_info_id.setText(f"<b>№ {active_order[0]}</b> (от {active_order[1].strftime('%d.%m.%Y %H:%M')})")
+            self.lbl_info_customer.setText(str(active_order[3]))
+            self.lbl_info_phone.setText(str(active_order[4]) if active_order[4] else "Не указан")
             
-            self.val_order_id.setText(f"№ {active_order[0]}")
-            self.val_date.setText(str(active_order[1]).split('.')[0])
-            self.val_client.setText(str(active_order[2]))
-            self.val_phone.setText(str(active_order[3] or "Не указан"))
-            self.val_address.setText(str(active_order[4]))
-            
-            self.load_order_items(self.current_order_id)
+            # Безопасное приведение суммы активного заказа к float
+            try:
+                amount_val = float(active_order[2])
+                self.lbl_info_amount.setText(f"<font color='#a6e3a1'><b>{amount_val:.2f} руб.</b></font>")
+            except (ValueError, TypeError):
+                self.lbl_info_amount.setText(f"<b>{active_order[2]} руб.</b>")
+
+            self.load_active_order_items()
             self.stack.setCurrentIndex(1)
         else:
-            # Свободен -> Пул свободных заказов
+            # Курьер свободен -> Показываем Экран 0
             self.current_order_id = None
             self.load_available_orders()
             self.stack.setCurrentIndex(0)
 
     def load_available_orders(self):
+        """Заполняет верхнюю таблицу доступными заказами."""
         self.table_available.setRowCount(0)
         orders = get_available_orders()
+        
         for row, data in enumerate(orders):
             self.table_available.insertRow(row)
             self.table_available.setItem(row, 0, QTableWidgetItem(str(data[0])))
-            self.table_available.setItem(row, 1, QTableWidgetItem(str(data[1])))
-            self.table_available.setItem(row, 2, QTableWidgetItem(str(data[2])))
+            self.table_available.setItem(row, 1, QTableWidgetItem(data[1].strftime("%d.%m.%Y %H:%M")))
+            
+            try:
+                price_val = float(data[2])
+                price_str = f"{price_val:.2f} руб."
+            except (ValueError, TypeError):
+                price_str = f"{data[2]} руб."
+                
+            self.table_available.setItem(row, 2, QTableWidgetItem(price_str))
             self.table_available.setItem(row, 3, QTableWidgetItem(str(data[3])))
-        # МЕТОД resizeColumnsToContents() ОТСЮДА УБРАН, ЧТОБЫ ИЗБЕЖАТЬ СЖАТИЯ!
 
-    def load_order_items(self, order_id):
+    def load_order_items(self):
+        """Заполняет нижнюю таблицу составом выбранного в пуле заказа (предпросмотр)."""
         self.table_items.setRowCount(0)
+        selected = self.table_available.selectedItems()
+        if not selected:
+            return
+            
+        row = self.table_available.currentRow()
+        order_id_item = self.table_available.item(row, 0)
+        if not order_id_item:
+            return
+            
+        order_id = int(order_id_item.text())
         items = get_order_items_details(order_id)
-        for row, data in enumerate(items):
-            self.table_items.insertRow(row)
-            self.table_items.setItem(row, 0, QTableWidgetItem(str(data[0])))
-            self.table_items.setItem(row, 1, QTableWidgetItem(str(data[1])))
-            self.table_items.setItem(row, 2, QTableWidgetItem(str(data[2])))
-            self.table_items.setItem(row, 3, QTableWidgetItem(str(data[3])))
+        
+        for r_idx, item in enumerate(items):
+            self.table_items.insertRow(r_idx)
+            self.table_items.setItem(r_idx, 0, QTableWidgetItem(str(item[0]))) # Название товара
+            
+            try:
+                price_at_order = float(item[1])
+                price_str = f"{price_at_order:.2f} руб."
+            except (ValueError, TypeError):
+                price_str = f"{item[1]} руб."
+            self.table_items.setItem(r_idx, 1, QTableWidgetItem(price_str)) # Цена за единицу
+            
+            self.table_items.setItem(r_idx, 2, QTableWidgetItem(str(item[2]))) # Количество
+            
+            try:
+                total_item_price = float(item[3])
+                total_str = f"{total_item_price:.2f} руб."
+            except (ValueError, TypeError):
+                total_str = f"{item[3]} руб."
+            self.table_items.setItem(r_idx, 3, QTableWidgetItem(total_str)) # Итого за товар
+
+    def load_active_order_items(self):
+        """Загружает состав текущего принятого заказа для экрана занятости."""
+        self.table_active_items.setRowCount(0)
+        if not self.current_order_id:
+            return
+        items = get_order_items_details(self.current_order_id)
+        for row, item in enumerate(items):
+            self.table_active_items.insertRow(row)
+            self.table_active_items.setItem(row, 0, QTableWidgetItem(str(item[0])))
+            
+            try:
+                p_val = float(item[1])
+                p_str = f"{p_val:.2f} руб."
+            except (ValueError, TypeError):
+                p_str = f"{item[1]} руб."
+            self.table_active_items.setItem(row, 1, QTableWidgetItem(p_str))
+            
+            self.table_active_items.setItem(row, 2, QTableWidgetItem(str(item[2])))
+            
+            try:
+                t_val = float(item[3])
+                t_str = f"{t_val:.2f} руб."
+            except (ValueError, TypeError):
+                t_str = f"{item[3]} руб."
+            self.table_active_items.setItem(row, 3, QTableWidgetItem(t_str))
 
     def take_order(self):
         selected = self.table_available.selectedItems()
@@ -188,7 +255,7 @@ class PageCourier(QWidget):
             QMessageBox.warning(self, "Внимание", "Пожалуйста, выберите заказ из таблицы!")
             return
             
-        row = selected[0].row()
+        row = self.table_available.currentRow()
         order_id = int(self.table_available.item(row, 0).text())
         
         reply = QMessageBox.question(

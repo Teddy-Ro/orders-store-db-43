@@ -82,17 +82,16 @@ class LoginWindow(QDialog):
         login = self.txt_login.text().strip()
         password = self.txt_password.text().strip()
 
-        # Быстрый вход для тестов разработки
-        if login == "" and password == "":
-            self.user_info = (1, "Главный Администратор", 1, "Разработчик")
-            self.accept()
-            return
-        elif login == "s" and password == "":
-            self.user_info = (2, "Иван Продавец", 2, "Менеджер")
-            self.accept()
-            return
+        # # Быстрый вход для тестов разработки
+        # if login == "" and password == "":
+        #     self.user_info = (1, "Главный Администратор", 1, "Разработчик")
+        #     self.accept()
+        #     return
+        # elif login == "s" and password == "":
+        #     self.user_info = (2, "Иван Продавец", 2, "Менеджер")
+        #     self.accept()
+        #     return
 
-        # Проверка через реальную БД
         try:
             result = check_login(login, password)
             if result:
