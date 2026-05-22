@@ -16,3 +16,6 @@ Thumbs.db
 
 # 
 требования/
+build/
+dist/
+OrdersStore.spec
