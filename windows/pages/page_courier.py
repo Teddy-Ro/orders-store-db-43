@@ -81,7 +81,6 @@ class PageCourier(QWidget):
 
         splitter_free.addWidget(widget_items)
         
-        # Добавляем сплиттер в главный слой страницы пула заказов
         layout_free.addWidget(splitter_free)
         self.stack.addWidget(self.page_free)
 
@@ -137,24 +136,20 @@ class PageCourier(QWidget):
 
         self.stack.addWidget(self.page_busy)
 
-        # Первичный запуск отрисовки данных
         self.refresh_screen()
 
     def refresh_screen(self):
         """Проверяет статус курьера в БД и переключает интерфейс."""
         active_order = get_active_courier_order(self.courier_id)
         
-        # Очищаем таблицу предпросмотра при обновлении экрана
         self.table_items.setRowCount(0)
 
         if active_order:
-            # Курьер занят -> Показываем Экран 1
             self.current_order_id = active_order[0]
             self.lbl_info_id.setText(f"<b>№ {active_order[0]}</b> (от {active_order[1].strftime('%d.%m.%Y %H:%M')})")
             self.lbl_info_customer.setText(str(active_order[3]))
             self.lbl_info_phone.setText(str(active_order[4]) if active_order[4] else "Не указан")
             
-            # Безопасное приведение суммы активного заказа к float
             try:
                 amount_val = float(active_order[2])
                 self.lbl_info_amount.setText(f"<font color='#a6e3a1'><b>{amount_val:.2f} руб.</b></font>")
@@ -164,7 +159,6 @@ class PageCourier(QWidget):
             self.load_active_order_items()
             self.stack.setCurrentIndex(1)
         else:
-            # Курьер свободен -> Показываем Экран 0
             self.current_order_id = None
             self.load_available_orders()
             self.stack.setCurrentIndex(0)
