@@ -2,6 +2,7 @@
 venv_u/
 .venvs/
 env/
+.venv_win/
 
 # Кэш Python
 __pycache__/

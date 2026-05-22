@@ -6,6 +6,6 @@ def get_connection():
         dbname="orders_store",
         user="admin",
         password="password",
-        host="localhost",
-        port="5432"
+        host="127.0.0.1",
+        port="5435"
     )
