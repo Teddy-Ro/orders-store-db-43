@@ -5,7 +5,6 @@ def init():
         conn = get_connection()
         cur = conn.cursor()
         
-        # Читаем и выполняем твой файл с SQL-запросами
         with open('sql/create_tables.sql', 'r', encoding='utf-8') as f:
             sql_script = f.read()
             cur.execute(sql_script)
