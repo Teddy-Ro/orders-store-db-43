@@ -1,7 +1,7 @@
 -- Очистка базы перед созданием (удобно для разработки)
 DROP TABLE IF EXISTS OrderItems CASCADE;
-DROP TABLE IF EXISTS Orders CASCADE;
 DROP TABLE IF EXISTS Documents CASCADE;
+DROP TABLE IF EXISTS Orders CASCADE;
 DROP TABLE IF EXISTS Products CASCADE;
 DROP TABLE IF EXISTS Suppliers CASCADE;
 DROP TABLE IF EXISTS Customers CASCADE;
@@ -21,8 +21,8 @@ CREATE TABLE Customers (
     FullName VARCHAR(255) NOT NULL,
     CompanyName VARCHAR(255),
     PhoneNumber VARCHAR(50),
-    Email VARCHAR(255),
-    ShippingAddress TEXT
+    Email VARCHAR(255)
+    -- Поле ShippingAddress убрано отсюда согласно схеме
 );
 
 CREATE TABLE Employees (
@@ -45,29 +45,32 @@ CREATE TABLE Products (
     UnitOfMeasurement VARCHAR(50),
     ExpirationDate DATE,
     StockBalance INT DEFAULT 0,
-    SupplierID INT REFERENCES Suppliers(SupplierID) ON DELETE SET NULL
+    SupplierID INT REFERENCES Suppliers(SupplierID) ON DELETE SET NULL,
+    Unit VARCHAR(20) -- Добавлено согласно схеме
 );
 
-CREATE TABLE Documents (
-    DocumentID SERIAL PRIMARY KEY,
-    DocumentType VARCHAR(100) NOT NULL,
-    DocumentNumber VARCHAR(100) UNIQUE NOT NULL,
-    CreationDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    OrderID INT, -- Может быть NULL, если документ не привязан к заказу
-    SupplierID INT REFERENCES Suppliers(SupplierID) ON DELETE CASCADE
-);
-
--- 3. Таблицы 2-го уровня зависимости (Заказы)
+-- Таблицы 2-го уровня зависимости (Заказы)
 CREATE TABLE Orders (
     OrderID SERIAL PRIMARY KEY,
     OrderDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     Status VARCHAR(50) DEFAULT 'Новый',
     TotalAmount DECIMAL(12, 2) DEFAULT 0.00,
     CustomerID INT REFERENCES Customers(CustomerID) ON DELETE CASCADE,
-    EmployeeID INT REFERENCES Employees(EmployeeID) ON DELETE SET NULL
+    EmployeeID INT REFERENCES Employees(EmployeeID) ON DELETE SET NULL,
+    ShippingAddress VARCHAR(255), -- Перенесено из Customers согласно схеме
+    CourierID INT REFERENCES Employees(EmployeeID) ON DELETE SET NULL -- Добавлено согласно схеме
 );
 
--- 4. Таблицы 3-го уровня зависимости (Состав заказа)
+-- 3. Таблицы 3-го уровня зависимости (Документы и Состав заказа)
+CREATE TABLE Documents (
+    DocumentID SERIAL PRIMARY KEY,
+    DocumentType VARCHAR(100) NOT NULL,
+    DocumentNumber VARCHAR(100) UNIQUE NOT NULL,
+    CreationDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    OrderID INT REFERENCES Orders(OrderID) ON DELETE SET NULL, -- Теперь ссылается на Orders (перенесено на 3-й уровень)
+    SupplierID INT REFERENCES Suppliers(SupplierID) ON DELETE CASCADE
+);
+
 CREATE TABLE OrderItems (
     OrderID INT REFERENCES Orders(OrderID) ON DELETE CASCADE,
     ProductID INT REFERENCES Products(ProductID) ON DELETE RESTRICT,
