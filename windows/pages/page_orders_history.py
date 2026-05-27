@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, 
-                             QMessageBox, QHeaderView, QAbstractItemView, QSplitter, QMenu, QPushButton, QLineEdit)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+                             QMessageBox, QHeaderView, QAbstractItemView, QSplitter, QMenu, QPushButton, QLineEdit, QFileDialog)
+from PyQt6.QtCore import Qt, QMarginsF
+from PyQt6.QtGui import QColor, QPdfWriter, QTextDocument, QPageSize, QPageLayout
+import os
 from database.queries import get_all_orders, get_order_details, update_order_status
 
 class PageOrdersHistory(QWidget):
@@ -10,7 +11,6 @@ class PageOrdersHistory(QWidget):
         self.access_level = user_info[2] 
 
         layout = QVBoxLayout(self)
-
         splitter = QSplitter(Qt.Orientation.Vertical)
 
         # --- ВЕРХНЯЯ ЧАСТЬ: СПИСОК ЗАКАЗОВ ---
@@ -18,7 +18,7 @@ class PageOrdersHistory(QWidget):
         vbox_top = QVBoxLayout(widget_top)
         vbox_top.setContentsMargins(0, 0, 0, 0)
         
-        # === НОВАЯ ПАНЕЛЬ ИНСТРУМЕНТОВ (ПОИСК И ОБНОВЛЕНИЕ) ===
+        # === ПАНЕЛЬ ИНСТРУМЕНТОВ ===
         toolbar = QHBoxLayout()
         lbl_orders = QLabel("ИСТОРИЯ ЗАКАЗОВ")
         lbl_orders.setStyleSheet("color: #a6adc8; font-weight: bold; font-size: 11px;")
@@ -32,13 +32,21 @@ class PageOrdersHistory(QWidget):
         toolbar.addWidget(self.in_search)
 
         toolbar.addStretch()
+
+        self.btn_print_selected = QPushButton("Печать выбранных")
+        self.btn_print_all = QPushButton("Печать всех")
+        
+        self.btn_print_selected.clicked.connect(self.print_selected_receipts)
+        self.btn_print_all.clicked.connect(self.print_all_receipts)
+        
+        toolbar.addWidget(self.btn_print_selected)
+        toolbar.addWidget(self.btn_print_all)
         
         self.btn_refresh = QPushButton("🔄 Обновить")
         self.btn_refresh.clicked.connect(self.load_orders)
         toolbar.addWidget(self.btn_refresh)
         
         vbox_top.addLayout(toolbar)
-        # ======================================================
 
         self.table_orders = QTableWidget(0, 7)
         self.table_orders.setHorizontalHeaderLabels(["ID", "Дата", "Статус", "Клиент", "Продавец", "Курьер", "Сумма"])
@@ -54,7 +62,6 @@ class PageOrdersHistory(QWidget):
         self.table_orders.horizontalHeader().setStretchLastSection(True)
 
         self.table_orders.itemSelectionChanged.connect(self.load_details)
-        
         self.table_orders.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_orders.customContextMenuRequested.connect(self.show_status_menu)
 
@@ -88,18 +95,15 @@ class PageOrdersHistory(QWidget):
 
         self.load_orders()
 
-    # === ЛОГИКА ФИЛЬТРАЦИИ (ПОИСКА) ===
     def filter_table(self, text):
         search_text = text.lower()
         for row in range(self.table_orders.rowCount()):
             row_visible = False
-            # Пробегаемся по всем колонкам в строке
             for col in range(self.table_orders.columnCount()):
                 item = self.table_orders.item(row, col)
                 if item and search_text in item.text().lower():
                     row_visible = True
-                    break # Если нашли совпадение хоть в одной ячейке - оставляем строку
-            # Скрываем или показываем строку
+                    break
             self.table_orders.setRowHidden(row, not row_visible)
 
     def load_orders(self):
@@ -109,28 +113,23 @@ class PageOrdersHistory(QWidget):
             orders = get_all_orders()
             for row, data in enumerate(orders):
                 self.table_orders.insertRow(row)
-                
                 o_id, date, status, customer, seller, courier, total = data
                 
                 items = [
                     QTableWidgetItem(str(o_id)),
-                    QTableWidgetItem(str(date).split('.')[0]), # Убираем микросекунды из даты
+                    QTableWidgetItem(str(date).split('.')[0]), 
                     QTableWidgetItem(status),
                     QTableWidgetItem(customer),
-                    QTableWidgetItem(seller),
-                    QTableWidgetItem(courier),
+                    QTableWidgetItem(seller if seller else "Не назначен"),
+                    QTableWidgetItem(courier if courier else "Не назначен"),
                     QTableWidgetItem(f"{total:.2f}")
                 ]
                 
                 status_item = items[2]
-                if status == 'Новый':
-                    status_item.setForeground(QColor("#89b4fa"))
-                elif status == 'Оплачен':
-                    status_item.setForeground(QColor("#a6e3a1"))
-                elif status == 'Отменен':
-                    status_item.setForeground(QColor("#f38ba8"))
-                elif status == 'В доставке':
-                    status_item.setForeground(QColor("#f9e2af"))
+                if status == 'Новый': status_item.setForeground(QColor("#89b4fa"))
+                elif status == 'Оплачен': status_item.setForeground(QColor("#a6e3a1"))
+                elif status == 'Отменен': status_item.setForeground(QColor("#f38ba8"))
+                elif status == 'В доставке': status_item.setForeground(QColor("#f9e2af"))
 
                 for col, item in enumerate(items):
                     self.table_orders.setItem(row, col, item)
@@ -148,7 +147,6 @@ class PageOrdersHistory(QWidget):
 
         row = selected_items[0].row()
         order_id = self.table_orders.item(row, 0).text()
-
         self.table_details.setRowCount(0)
         try:
             details = get_order_details(order_id)
@@ -174,7 +172,6 @@ class PageOrdersHistory(QWidget):
         menu = QMenu()
         menu.setStyleSheet("QMenu { font-size: 13px; }")
         
-        # БЛОКИРОВКА: Если заказ отменен ИЛИ уже успешно доставлен — меню не создаем
         if current_status == 'Отменен':
             QMessageBox.information(self, "Информация", "Этот заказ отменен. Изменение статуса невозможно.")
             return
@@ -182,7 +179,6 @@ class PageOrdersHistory(QWidget):
             QMessageBox.information(self, "Информация", "Этот заказ уже успешно доставлен. Изменение статуса заблокировано.")
             return
             
-        # Для всех остальных промежуточных статусов ('Новый', 'Оплачен', 'В доставке') генерируем меню:
         act_new = menu.addAction("🔵 Перевести в 'Новый'")
         act_pay = menu.addAction("🟢 Перевести в 'Оплачен'")
         act_del = menu.addAction("🟡 Перевести в 'В доставке'")
@@ -210,3 +206,155 @@ class PageOrdersHistory(QWidget):
                 self.in_search.clear()
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка БД", f"Не удалось изменить статус:\n{e}")
+
+    def print_selected_receipts(self):
+        """Собирает индексы только выделенных пользователем строк"""
+        selected_rows = list(set([index.row() for index in self.table_orders.selectedIndexes()]))
+        self.export_multiple_pdfs(selected_rows)
+
+    def print_all_receipts(self):
+        """Собирает индексы только тех строк, которые реально видны на экране (не скрыты поиском)"""
+        visible_rows = []
+        for row in range(self.table_orders.rowCount()):
+            if not self.table_orders.isRowHidden(row):
+                visible_rows.append(row)
+        self.export_multiple_pdfs(visible_rows)
+
+    def export_multiple_pdfs(self, rows_to_print):
+        """Генерирует ОДИН сводный PDF-отчет в виде компактной таблицы реестра с переносами строк"""
+        if not rows_to_print:
+            QMessageBox.warning(self, "Внимание", "Нет заказов для включения в отчет. Выделите нужные строки.")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить сводный отчет", "Сводный_отчет_по_заказам.pdf", "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        from database.queries import get_order_details
+        from PyQt6.QtGui import QPageLayout
+
+        # HTML-верстка с уменьшенными на пару пунктов шрифтами и структурированными переносами
+        html_content = """
+        <html>
+        <head>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #111111; margin: 15pt; }
+            h1 { text-align: center; color: #111111; font-size: 20pt; margin-bottom: 4pt; text-transform: uppercase; font-weight: bold; }
+            .subtitle { text-align: center; color: #444444; font-size: 11pt; margin-bottom: 20pt; font-style: italic; }
+            
+            .report-table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+            .report-table th { background-color: #2c3e50; color: #ffffff; font-weight: bold; padding: 10pt 8pt; border: 2px solid #34495e; font-size: 11pt; text-align: center; }
+            .report-table td { padding: 8pt 7pt; border: 1px solid #7f8c8d; vertical-align: middle; }
+            
+            /* Информационная строка-заголовок для каждого отдельного заказа */
+            .order-header-row { background-color: #d5dbdb; font-weight: bold; color: #1b2631; font-size: 11.5pt; }
+            .order-label { color: #566573; font-weight: bold; }
+            
+            /* Итоговая строка внутри заказа */
+            .order-subtotal-row { background-color: #f8f9f9; font-style: italic; color: #2c3e50; font-size: 10.5pt; }
+            
+            .grand-total-box { text-align: right; margin-top: 25pt; font-size: 16pt; font-weight: bold; color: #b03a2e; border-top: 3px double #b03a2e; padding-top: 8pt; }
+        </style>
+        </head>
+        <body>
+            <h1>Сводный реестр оформленных заказов</h1>
+            <div class='subtitle'>Система учета Orders Store ERP • Сводный аналитический документ</div>
+            
+            <table class='report-table'>
+                <thead>
+                    <tr>
+                        <th width='15%'>Артикул</th>
+                        <th width='43%'>Наименование товарной спецификации</th>
+                        <th width='14%'>Цена за ед.</th>
+                        <th width='11%'>Количество</th>
+                        <th width='17%'>Сумма позиции</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        grand_total = 0.0
+
+        for row in rows_to_print:
+            order_id = self.table_orders.item(row, 0).text()
+            date = self.table_orders.item(row, 1).text()
+            status = self.table_orders.item(row, 2).text()
+            customer = self.table_orders.item(row, 3).text()
+            seller = self.table_orders.item(row, 4).text()
+            courier = self.table_orders.item(row, 5).text()
+            total_str = self.table_orders.item(row, 6).text()
+            
+            try:
+                grand_total += float(total_str)
+            except:
+                pass
+
+            try:
+                details = get_order_details(order_id)
+                if not details:
+                    continue
+                
+                # Заголовок заказа: убрали разделители "|" и структурировали через теги <br>
+                html_content += f"""
+                <tr class='order-header-row'>
+                    <td colspan='5' style='padding: 10pt 8pt; line-height: 1.4;'>
+                        ЗАКАЗ № {order_id} от {date} <br>
+                        <span class='order-label'>Статус наряда:</span> {status} <br>
+                        <span class='order-label'>Клиент (ФИО):</span> {customer} <br>
+                        <span class='order-label'>Оператор (Продавец):</span> {seller} <br>
+                        <span class='order-label'>Служба доставки (Курьер):</span> {courier}
+                    </td>
+                </tr>
+                """
+
+                # Вывод товарных позиций наряда
+                for data in details:
+                    art, name, price, qty, summa = data
+                    html_content += f"""
+                    <tr>
+                        <td align='center'><b>{art}</b></td>
+                        <td>{name}</td>
+                        <td align='right'>{price:.2f} руб.</td>
+                        <td align='center'>{qty} шт.</td>
+                        <td align='right'><b>{summa:.2f} руб.</b></td>
+                    </tr>
+                    """
+                
+                # Строка промежуточного итога по наряду
+                html_content += f"""
+                <tr class='order-subtotal-row'>
+                    <td colspan='4' align='right' style='padding: 8pt 7pt;'>Промежуточный итог по наряду № {order_id}:</td>
+                    <td align='right' style='color: #1b2631; font-weight: bold; padding: 8pt 7pt;'>{float(total_str):.2f} руб.</td>
+                </tr>
+                """
+                    
+            except Exception as e:
+                print(f"Ошибка обработки состава заказа №{order_id}: {e}")
+
+        html_content += f"""
+                </tbody>
+            </table>
+            <div class='grand-total-box'>ОБЩИЙ ВАЛОВЫЙ ДОХОД ПО РЕЕСТРУ: {grand_total:.2f} руб.</div>
+        </body>
+        </html>
+        """
+
+        try:
+            writer = QPdfWriter(file_path)
+            writer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+            writer.setPageOrientation(QPageLayout.Orientation.Landscape)
+            writer.setResolution(300)
+            writer.setPageMargins(QMarginsF(15, 15, 15, 15))
+
+            doc = QTextDocument()
+            doc.setHtml(html_content)
+            doc.print(writer)
+            
+            QMessageBox.information(
+                self, "Успех", 
+                f"Сводный документ успешно сформирован компактным шрифтом!\n\nФайл сохранен:\n{file_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка печати", f"Не удалось скомпилировать PDF-документ:\n{e}")

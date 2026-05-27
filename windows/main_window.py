@@ -115,6 +115,6 @@ class MainWindow(QMainWindow):
         self.apply_theme()
 
     def logout(self):
-        """Полный безопасный перезапуск приложения для смены пользователя"""
+        """Безопасный выход в окно авторизации без перезапуска процесса"""
+        self.is_logged_out = True
         self.close()
-        os.execl(sys.executable, sys.executable, *sys.argv)

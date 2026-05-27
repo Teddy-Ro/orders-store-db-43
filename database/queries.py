@@ -299,30 +299,48 @@ def get_products_for_search():
 # =====================================================================
 
 def create_order_transaction(customer_id, seller_id, address, cart_items):
-    conn = get_connection(); cur = conn.cursor()
+    conn = get_connection()
+    cur = conn.cursor()
     try:
+        # 1. Проверяем остатки с жесткой блокировкой строк (FOR UPDATE)
+        for item in cart_items:
+            cur.execute("SELECT StockBalance, ProductName FROM Products WHERE ProductID = %s FOR UPDATE;", (item['product_id'],))
+            res = cur.fetchone()
+            if not res:
+                raise ValueError(f"Товар с ID {item['product_id']} не найден.")
+            
+            current_stock, prod_name = res
+            
+            # Если пока мы собирали корзину товар кто-то купил:
+            if current_stock < item['qty']:
+                raise ValueError(f"Товара '{prod_name}' недостаточно на складе!\nВ наличии: {current_stock}, требуется: {item['qty']}")
+                
+            # Списываем остаток
+            cur.execute("UPDATE Products SET StockBalance = StockBalance - %s WHERE ProductID = %s;", 
+                        (item['qty'], item['product_id']))
+
+        # 2. Создаем сам заказ
         cur.execute("""
             INSERT INTO Orders (CustomerID, EmployeeID, OrderDate, Status, ShippingAddress) 
             VALUES (%s, %s, CURRENT_TIMESTAMP, 'Новый', %s) RETURNING OrderID;
         """, (customer_id, seller_id, address))
         order_id = cur.fetchone()[0]
 
+        # 3. Сохраняем состав
         for item in cart_items:
             cur.execute("""
                 INSERT INTO OrderItems (OrderID, ProductID, Quantity, PriceAtOrder) 
                 VALUES (%s, %s, %s, %s);
             """, (order_id, item['product_id'], item['qty'], item['price']))
-            
-            cur.execute("UPDATE Products SET StockBalance = StockBalance - %s WHERE ProductID = %s;", 
-                        (item['qty'], item['product_id']))
-
+        
         conn.commit()
         return order_id
     except Exception as e:
         conn.rollback()
         raise e
     finally:
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
 
 def get_all_orders():
     conn = get_connection(); cur = conn.cursor()

@@ -356,8 +356,51 @@ class PageOrders(QWidget):
 
         try:
             order_id = create_order_transaction(customer_id, self.seller_id, address, items_to_db)
+            
             QMessageBox.information(self, "Успех", f"Заказ №{order_id} успешно оформлен и передан на сборку!")
             self.clear_form()
-            self.load_dropdowns() 
+            self.load_dropdowns()
+            
+        except ValueError as ve:
+            error_msg = str(ve)
+            
+            self.load_dropdowns()
+            
+            adjusted_products = []
+            
+            for p_id in list(self.cart_items.keys()):
+                actual_stock = 0
+                for i in range(self.combo_product.count()):
+                    prod_data = self.combo_product.itemData(i)
+                    if prod_data and prod_data['id'] == p_id:
+                        actual_stock = prod_data['stock']
+                        break
+                
+                self.cart_items[p_id]['stock'] = actual_stock
+                
+                if self.cart_items[p_id]['qty'] > actual_stock:
+                    adjusted_products.append(f"• {self.cart_items[p_id]['name']} (запрошено {self.cart_items[p_id]['qty']} шт. → изменено на {actual_stock} шт.)")
+                    
+                    if actual_stock > 0:
+                        self.cart_items[p_id]['qty'] = actual_stock
+                    else:
+                        del self.cart_items[p_id]
+
+            self.update_cart_table()
+            self.on_product_selected()
+            
+            if adjusted_products:
+                changes_text = "\n".join(adjusted_products)
+                QMessageBox.warning(
+                    self, "Корректировка заказа", 
+                    f"Некоторые товары были выкуплены другими операторами.\n"
+                    f"Количество в вашем заказе автоматически откачено до остатка на складе:\n\n{changes_text}\n\n"
+                    f"Проверьте корзину и нажмите кнопку отправки повторно."
+                )
+            else:
+                QMessageBox.warning(self, "Ошибка остатков", f"Не удалось оформить заказ:\n{error_msg}")
+                
         except Exception as e:
             QMessageBox.critical(self, "Ошибка БД", f"Сбой при оформлении заказа:\n{e}")
+            self.load_dropdowns()
+            self.on_product_selected()
